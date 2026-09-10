@@ -4,10 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "server": "npm --prefix server start",
-    "server:dev": "npm --prefix server run dev",
+    "dev": "npm --prefix client run dev",
     "client": "npm --prefix client run dev",
-    "seed": "npm --prefix server run seed",
-    "build": "npm --prefix client run build"
+    "build": "npm --prefix client run build",
+    "android:sync": "npm --prefix client run android:sync",
+    "android:open": "npm --prefix client run android:open",
+    "android:run": "npm --prefix client run android:run",
+    "legacy:server": "npm --prefix server start",
+    "legacy:server:dev": "npm --prefix server run dev",
+    "legacy:seed": "npm --prefix server run seed"
   }
 }

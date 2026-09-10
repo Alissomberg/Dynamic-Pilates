@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Users, CalendarCheck, DollarSign } from 'lucide-react';
+import { LayoutDashboard, Users, CalendarCheck, DollarSign, Settings } from 'lucide-react';
 import clsx from 'clsx';
 
 export function BottomNav({ activeTab, onTabChange, alertasCount = 0 }) {
@@ -7,12 +7,13 @@ export function BottomNav({ activeTab, onTabChange, alertasCount = 0 }) {
     { id: 'inicio', label: 'Início', icon: LayoutDashboard },
     { id: 'presenca', label: 'Presença', icon: CalendarCheck },
     { id: 'alunos', label: 'Alunos', icon: Users },
-    { id: 'financeiro', label: 'Financeiro', icon: DollarSign, badge: alertasCount }
+    { id: 'financeiro', label: 'Financeiro', icon: DollarSign, badge: alertasCount },
+    { id: 'ajustes', label: 'Ajustes', icon: Settings }
   ];
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-lg">
-      <div className="max-w-xl mx-auto px-2 py-2 flex items-center justify-around">
+      <div className="max-w-2xl mx-auto px-1 py-2 flex items-center justify-around">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -22,7 +23,7 @@ export function BottomNav({ activeTab, onTabChange, alertasCount = 0 }) {
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
               className={clsx(
-                "relative flex flex-col items-center justify-center py-1.5 px-4 rounded-xl min-w-[72px] min-h-[54px] transition-all touch-press",
+                "relative flex flex-col items-center justify-center py-1.5 px-2 sm:px-4 rounded-xl min-w-[62px] sm:min-w-[72px] min-h-[54px] transition-all touch-press",
                 isActive 
                   ? "text-pilates-600 font-bold bg-pilates-50/80" 
                   : "text-slate-500 hover:text-slate-800 font-medium"

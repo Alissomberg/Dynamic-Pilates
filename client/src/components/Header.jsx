@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, UserCheck } from 'lucide-react';
+import { Calendar, CheckCircle2 } from 'lucide-react';
 
 export function Header() {
   const today = new Date();
@@ -34,9 +34,15 @@ export function Header() {
         </div>
 
         {/* Date / Today pill */}
-        <div className="flex items-center gap-2 bg-slate-100/80 px-3.5 py-2 rounded-xl border border-slate-200/60 text-slate-700 text-xs sm:text-sm font-medium">
-          <Calendar className="w-4 h-4 text-pilates-600 shrink-0" />
-          <span>{capitalizedDate}</span>
+        <div className="flex flex-col items-end gap-1.5">
+          <div className="flex items-center gap-2 bg-slate-100/80 px-3.5 py-2 rounded-xl border border-slate-200/60 text-slate-700 text-xs sm:text-sm font-medium">
+            <Calendar className="w-4 h-4 text-pilates-600 shrink-0" />
+            <span>{capitalizedDate}</span>
+          </div>
+          <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            Dados salvos neste tablet
+          </span>
         </div>
       </div>
     </header>

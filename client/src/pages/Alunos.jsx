@@ -23,8 +23,36 @@ import {
   Edit3,
   Check,
   ShieldCheck,
-  FileText
+  FileText,
+  Settings2,
+  Plus
 } from 'lucide-react';
+
+const DIAS_SEMANA = [
+  { id: 1, label: 'Segunda' },
+  { id: 2, label: 'Terça' },
+  { id: 3, label: 'Quarta' },
+  { id: 4, label: 'Quinta' },
+  { id: 5, label: 'Sexta' },
+  { id: 6, label: 'Sábado' }
+];
+
+function mesAtual() {
+  const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function formatarMes(month) {
+  const [year, monthNumber] = month.split('-').map(Number);
+  const text = new Date(year, monthNumber - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function mudarMes(month, offset) {
+  const [year, monthNumber] = month.split('-').map(Number);
+  const date = new Date(year, monthNumber - 1 + offset, 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
 
 export function Alunos() {
   const queryClient = useQueryClient();
@@ -35,28 +63,40 @@ export function Alunos() {
   const [isNovoAlunoOpen, setIsNovoAlunoOpen] = useState(false);
   const [nome, setNome] = useState('');
   const [telefone, setTelefone] = useState('');
-  const [plano, setPlano] = useState('trimestral');
+  const [plano, setPlano] = useState('mensal');
+  const [nomePlano, setNomePlano] = useState('Mensal');
+  const [duracaoPlano, setDuracaoPlano] = useState('1');
+  const [selectedPresetId, setSelectedPresetId] = useState(null);
   const [valor, setValor] = useState('185');
   const [diaVencimento, setDiaVencimento] = useState('10');
   const [observacoes, setObservacoes] = useState('');
-  const [selectedDias, setSelectedDias] = useState([1, 3]); // Seg e Qua
-  const [horarioAula, setHorarioAula] = useState('08:00');
+  const [horariosPorDia, setHorariosPorDia] = useState({ 1: '08:00', 3: '09:00' });
+
+  // Modal simples para cadastrar opções frequentes de plano
+  const [isPlanosOpen, setIsPlanosOpen] = useState(false);
+  const [novoPlanoNome, setNovoPlanoNome] = useState('');
+  const [novoPlanoDuracao, setNovoPlanoDuracao] = useState('1');
+  const [novoPlanoValor, setNovoPlanoValor] = useState('185');
 
   // Modal de Detalhes do Aluno
   const [selectedAlunoId, setSelectedAlunoId] = useState(null);
-  const [mesFinanceiro, setMesFinanceiro] = useState('2026-08');
-  const [mesPresenca, setMesPresenca] = useState('2026-08');
+  const [mesFinanceiro, setMesFinanceiro] = useState(mesAtual);
+  const [mesPresenca, setMesPresenca] = useState(mesAtual);
 
   // Modal de Remarcar Horários
   const [isRemarcarOpen, setIsRemarcarOpen] = useState(false);
-  const [remarcarDias, setRemarcarDias] = useState([1, 3]);
-  const [remarcarHora, setRemarcarHora] = useState('08:00');
+  const [remarcarHorarios, setRemarcarHorarios] = useState({ 1: '08:00', 3: '09:00' });
   const [salvandoRemarcacao, setSalvandoRemarcacao] = useState(false);
 
   // Buscar lista de alunos
   const { data: alunos = [], isLoading } = useQuery({
     queryKey: ['alunos', searchTerm, statusFilter],
     queryFn: () => api.getAlunos({ search: searchTerm, status: statusFilter })
+  });
+
+  const { data: planos = [] } = useQuery({
+    queryKey: ['planos'],
+    queryFn: () => api.getPlanPresets()
   });
 
   // Buscar detalhes do aluno selecionado
@@ -91,12 +131,14 @@ export function Alunos() {
       setIsNovoAlunoOpen(false);
       setNome('');
       setTelefone('');
-      setPlano('trimestral');
+      setPlano('mensal');
+      setNomePlano('Mensal');
+      setDuracaoPlano('1');
+      setSelectedPresetId(null);
       setValor('185');
       setDiaVencimento('10');
       setObservacoes('');
-      setSelectedDias([1, 3]);
-      setHorarioAula('08:00');
+      setHorariosPorDia({ 1: '08:00', 3: '09:00' });
     },
     onError: (err) => {
       alert('Erro ao cadastrar aluno: ' + err.message);
@@ -109,11 +151,14 @@ export function Alunos() {
       alert('Por favor, informe o nome do aluno.');
       return;
     }
-    const horarios = selectedDias.map(dia => ({ dia, hora: horarioAula }));
+    const horarios = Object.entries(horariosPorDia).map(([dia, hora]) => ({ dia: Number(dia), hora }));
     criarAlunoMutation.mutate({
       nome: nome.trim(),
       telefone: telefone.trim(),
       plano,
+      nome_plano: nomePlano,
+      duracao_meses: Number(duracaoPlano),
+      preset_id: selectedPresetId,
       valor: Number(valor),
       dia_vencimento: Number(diaVencimento),
       observacoes: observacoes.trim(),
@@ -126,7 +171,7 @@ export function Alunos() {
     if (!selectedAlunoId) return;
     setSalvandoRemarcacao(true);
     try {
-      const novosHorarios = remarcarDias.map(dia => ({ dia, hora: remarcarHora }));
+      const novosHorarios = Object.entries(remarcarHorarios).map(([dia, hora]) => ({ dia: Number(dia), hora }));
       await api.updateAlunoHorarios(selectedAlunoId, novosHorarios);
       queryClient.invalidateQueries({ queryKey: ['aluno', selectedAlunoId] });
       queryClient.invalidateQueries({ queryKey: ['alunos'] });
@@ -140,35 +185,40 @@ export function Alunos() {
     }
   };
 
-  const toggleDiaSemana = (dia, selectedList, setter) => {
-    if (selectedList.includes(dia)) {
-      if (selectedList.length > 1) {
-        setter(selectedList.filter(d => d !== dia));
+  const toggleDiaSemana = (dia, setter) => {
+    setter((current) => {
+      const next = { ...current };
+      if (next[dia]) {
+        if (Object.keys(next).length > 1) delete next[dia];
+      } else {
+        next[dia] = '08:00';
       }
-    } else {
-      setter([...selectedList, dia].sort());
-    }
+      return next;
+    });
   };
 
-  const mesesNomes = {
-    '2026-05': 'Maio 2026',
-    '2026-06': 'Junho 2026',
-    '2026-07': 'Julho 2026',
-    '2026-08': 'Agosto 2026',
-    '2026-09': 'Setembro 2026',
-    '2026-10': 'Outubro 2026',
-    '2026-11': 'Novembro 2026'
+  const aplicarPlano = (preset) => {
+    setSelectedPresetId(preset.id);
+    setNomePlano(preset.nome);
+    setDuracaoPlano(String(preset.duracao_meses));
+    setPlano(preset.duracao_meses === 1 ? 'mensal' : preset.duracao_meses === 3 ? 'trimestral' : 'personalizado');
+    setValor(String(preset.valor));
   };
 
-  const mesesOrdem = ['2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11'];
-
-  const mudarMes = (mesAtual, offset, setter) => {
-    const idx = mesesOrdem.indexOf(mesAtual);
-    const novoIdx = idx + offset;
-    if (novoIdx >= 0 && novoIdx < mesesOrdem.length) {
-      setter(mesesOrdem[novoIdx]);
-    }
-  };
+  const criarPlanoMutation = useMutation({
+    mutationFn: () => api.createPlanPreset({
+      nome: novoPlanoNome,
+      duracao_meses: Number(novoPlanoDuracao),
+      valor: Number(novoPlanoValor)
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['planos'] });
+      setNovoPlanoNome('');
+      setNovoPlanoDuracao('1');
+      setNovoPlanoValor('185');
+    },
+    onError: (error) => alert('Não foi possível salvar o plano: ' + error.message)
+  });
 
   const diasSemanaNome = ['', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 
@@ -182,18 +232,27 @@ export function Alunos() {
             Alunos do Estúdio ({alunos.length})
           </h2>
           <p className="text-xs sm:text-sm text-slate-500">
-            Contratos, fidelidade, cobrança mensal e histórico de aulas
+            Planos, pagamentos e programação de aulas
           </p>
         </div>
 
-        <TouchButton
-          onClick={() => setIsNovoAlunoOpen(true)}
-          icon={UserPlus}
-          variant="primary"
-          size="md"
-        >
-          + Novo Aluno
-        </TouchButton>
+        <div className="flex items-center gap-2">
+          <TouchButton onClick={() => setIsPlanosOpen(true)} icon={Settings2} variant="outline" size="sm">
+            Planos
+          </TouchButton>
+          <TouchButton
+            onClick={() => {
+              const monthly = planos.find((item) => item.duracao_meses === 1);
+              if (monthly) aplicarPlano(monthly);
+              setIsNovoAlunoOpen(true);
+            }}
+            icon={UserPlus}
+            variant="primary"
+            size="md"
+          >
+            + Novo Aluno
+          </TouchButton>
+        </div>
       </div>
 
       {/* Barra de Busca e Filtros */}
@@ -252,8 +311,8 @@ export function Alunos() {
               key={aluno.id}
               onClick={() => {
                 setSelectedAlunoId(aluno.id);
-                setMesFinanceiro('2026-08');
-                setMesPresenca('2026-08');
+                setMesFinanceiro(mesAtual());
+                setMesPresenca(mesAtual());
               }}
               className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-card hover:border-pilates-400 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
             >
@@ -265,11 +324,11 @@ export function Alunos() {
                     </h3>
                     <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                       <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded capitalize">
-                        {aluno.tipo_plano}
+                        {aluno.nome_plano || aluno.tipo_plano}
                       </span>
-                      {aluno.duracao_fidelidade_meses > 0 && (
+                      {aluno.duracao_plano_meses > 1 && (
                         <span className="text-[11px] font-semibold text-pilates-700 bg-pilates-50 px-2 py-0.5 rounded border border-pilates-200">
-                          Fidelidade 3 meses
+                          Ciclo de {aluno.duracao_plano_meses} meses
                         </span>
                       )}
                     </div>
@@ -282,7 +341,7 @@ export function Alunos() {
                     <span className="text-slate-400 block font-medium">Cobrança</span>
                     <span className="font-black text-slate-900 text-sm">
                       R$ {Number(aluno.valor || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      <span className="text-[11px] font-normal text-slate-500">/mês</span>
+                      <span className="text-[11px] font-normal text-slate-500">/ciclo</span>
                     </span>
                     <span className="text-[11px] text-slate-500 block mt-0.5">
                       Venc: dia {aluno.dia_vencimento}
@@ -324,8 +383,8 @@ export function Alunos() {
                   <button
                     onClick={() => {
                       setSelectedAlunoId(aluno.id);
-                      setMesFinanceiro('2026-08');
-                      setMesPresenca('2026-08');
+                      setMesFinanceiro(mesAtual());
+                      setMesPresenca(mesAtual());
                     }}
                     className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition-colors"
                   >
@@ -381,30 +440,26 @@ export function Alunos() {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs bg-slate-50 p-3 rounded-xl border border-slate-100">
                 <div>
                   <span className="text-slate-400 block font-medium">Plano</span>
-                  <span className="font-bold text-slate-900 capitalize text-sm">
-                    {alunoDetalhe.tipo_plano}
+                  <span className="font-bold text-slate-900 text-sm">
+                    {alunoDetalhe.nome_plano || alunoDetalhe.tipo_plano}
                   </span>
-                  <span className="text-[11px] text-slate-500 block">Cobrança Mensal</span>
+                  <span className="text-[11px] text-slate-500 block">
+                    Pagamento a cada {alunoDetalhe.duracao_plano_meses} {alunoDetalhe.duracao_plano_meses === 1 ? 'mês' : 'meses'}
+                  </span>
                 </div>
                 <div>
                   <span className="text-slate-400 block font-medium">Valor</span>
                   <span className="font-bold text-emerald-700 text-sm">
-                    R$ {Number(alunoDetalhe.valor).toFixed(2)}/mês
+                    R$ {Number(alunoDetalhe.valor).toFixed(2)}/ciclo
                   </span>
                   <span className="text-[11px] text-slate-500 block">Venc: dia {alunoDetalhe.dia_vencimento}</span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block font-medium">Fidelidade</span>
+                  <span className="text-slate-400 block font-medium">Duração do ciclo</span>
                   <span className="font-bold text-slate-900 text-sm">
-                    {alunoDetalhe.duracao_fidelidade_meses > 0 ? `${alunoDetalhe.duracao_fidelidade_meses} meses` : 'Sem fidelidade'}
+                    {alunoDetalhe.duracao_plano_meses} {alunoDetalhe.duracao_plano_meses === 1 ? 'mês' : 'meses'}
                   </span>
-                  {alunoDetalhe.fidelidade && alunoDetalhe.duracao_fidelidade_meses > 0 && (
-                    <span className={`text-[10px] font-bold block mt-0.5 ${
-                      alunoDetalhe.fidelidade.isFidelityActive ? 'text-pilates-700' : 'text-emerald-700'
-                    }`}>
-                      {alunoDetalhe.fidelidade.label}
-                    </span>
-                  )}
+                  <span className="text-[10px] font-bold block mt-0.5 text-pilates-700">Valor referente ao ciclo completo</span>
                 </div>
                 <div>
                   <span className="text-slate-400 block font-medium">Início Contrato</span>
@@ -426,15 +481,16 @@ export function Alunos() {
                 <button
                   onClick={() => {
                     if (alunoDetalhe.horarios && alunoDetalhe.horarios.length > 0) {
-                      setRemarcarDias(alunoDetalhe.horarios.map(h => h.dia_semana));
-                      setRemarcarHora(alunoDetalhe.horarios[0].horario);
+                      setRemarcarHorarios(Object.fromEntries(
+                        alunoDetalhe.horarios.map((h) => [h.dia_semana, h.horario])
+                      ));
                     }
                     setIsRemarcarOpen(true);
                   }}
                   className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-pilates-50 hover:bg-pilates-100 text-pilates-700 font-bold text-xs border border-pilates-200 transition-colors"
                 >
                   <Edit3 className="w-3.5 h-3.5" />
-                  <span>Remarcar Horário</span>
+                  <span>Editar Horários</span>
                 </button>
               </div>
 
@@ -451,27 +507,27 @@ export function Alunos() {
               </div>
             </div>
 
-            {/* SEÇÃO 1: Histórico de Mensalidades Paginado por Mês */}
+            {/* SEÇÃO 1: Histórico financeiro paginado por mês */}
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
               <div className="flex items-center justify-between">
                 <h4 className="text-sm font-bold text-slate-900 flex items-center gap-1.5">
                   <DollarSign className="w-4 h-4 text-pilates-600" />
-                  Mensalidades & Cobranças
+                  Pagamentos & Cobranças
                 </h4>
 
                 <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
                   <button
-                    onClick={() => mudarMes(mesFinanceiro, -1, setMesFinanceiro)}
+                    onClick={() => setMesFinanceiro(mudarMes(mesFinanceiro, -1))}
                     className="p-1 rounded hover:bg-white text-slate-600"
                     title="Mês anterior"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
                   <span className="text-xs font-bold text-slate-800 px-2 min-w-[90px] text-center">
-                    {mesesNomes[mesFinanceiro] || mesFinanceiro}
+                    {formatarMes(mesFinanceiro)}
                   </span>
                   <button
-                    onClick={() => mudarMes(mesFinanceiro, 1, setMesFinanceiro)}
+                    onClick={() => setMesFinanceiro(mudarMes(mesFinanceiro, 1))}
                     className="p-1 rounded hover:bg-white text-slate-600"
                     title="Próximo mês"
                   >
@@ -497,8 +553,14 @@ export function Alunos() {
                   </div>
                   <div>
                     <span className="text-slate-400 block font-medium">Status</span>
-                    <span className={`font-bold ${historicoFinanceiroData.financeiro.status === 'EM_DIA' ? 'text-emerald-700' : 'text-rose-600'}`}>
-                      {historicoFinanceiroData.financeiro.status === 'EM_DIA' ? 'Em dia' : 'Em atraso'}
+                    <span className={`font-bold ${
+                      historicoFinanceiroData.financeiro.status === 'EM_DIA'
+                        ? 'text-emerald-700'
+                        : historicoFinanceiroData.financeiro.status === 'EM_ATRASO'
+                          ? 'text-rose-600'
+                          : 'text-amber-700'
+                    }`}>
+                      {{ EM_DIA: 'Em dia', EM_ATRASO: 'Em atraso', HOJE: 'Vence hoje', PENDENTE: 'Pendente' }[historicoFinanceiroData.financeiro.status]}
                     </span>
                   </div>
                 </div>
@@ -515,7 +577,7 @@ export function Alunos() {
                         <span className="font-bold text-slate-800">
                           {new Date(p.data_pagamento + 'T00:00:00').toLocaleDateString('pt-BR')}
                         </span>
-                        <span className="text-slate-500 ml-2">Mensalidade Quitada</span>
+                        <span className="text-slate-500 ml-2">Ciclo quitado</span>
                         <span className="text-slate-400 ml-1 uppercase text-[10px]">({p.forma_pagamento})</span>
                       </div>
                       <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
@@ -530,7 +592,7 @@ export function Alunos() {
                         <span className="font-bold text-slate-800">
                           Venc: {new Date(c.data_vencimento + 'T00:00:00').toLocaleDateString('pt-BR')}
                         </span>
-                        <span className="text-rose-600 ml-2 font-semibold">Mensalidade Aberta</span>
+                        <span className="text-rose-600 ml-2 font-semibold">Pagamento em aberto</span>
                       </div>
                       <span className="font-bold text-rose-700 bg-rose-100 px-2 py-0.5 rounded border border-rose-200">
                         Pendente R$ {Number(c.valor_esperado).toFixed(2)}
@@ -553,17 +615,17 @@ export function Alunos() {
 
                 <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg">
                   <button
-                    onClick={() => mudarMes(mesPresenca, -1, setMesPresenca)}
+                    onClick={() => setMesPresenca(mudarMes(mesPresenca, -1))}
                     className="p-1 rounded hover:bg-white text-slate-600"
                     title="Mês anterior"
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
                   <span className="text-xs font-bold text-slate-800 px-2 min-w-[90px] text-center">
-                    {mesesNomes[mesPresenca] || mesPresenca}
+                    {formatarMes(mesPresenca)}
                   </span>
                   <button
-                    onClick={() => mudarMes(mesPresenca, 1, setMesPresenca)}
+                    onClick={() => setMesPresenca(mudarMes(mesPresenca, 1))}
                     className="p-1 rounded hover:bg-white text-slate-600"
                     title="Próximo mês"
                   >
@@ -622,36 +684,27 @@ export function Alunos() {
       <TouchModal
         isOpen={isRemarcarOpen}
         onClose={() => setIsRemarcarOpen(false)}
-        title="Remarcar Horário do Aluno"
+        title="Editar Horários do Aluno"
       >
         <div className="space-y-4">
           <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 text-xs">
             <p className="text-slate-500">Aluno</p>
             <h4 className="font-bold text-slate-900 text-base">{alunoDetalhe?.nome}</h4>
             <p className="text-slate-500 mt-1">
-              A remarcação atualiza a programação atual e futura. O histórico de presenças passadas é totalmente preservado.
+              A alteração vale para as próximas aulas. As presenças antigas continuam guardadas.
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1.5">
-              Novos Dias de Aula
-            </label>
+            <label className="block text-sm font-bold text-slate-700 mb-1.5">Escolha os dias</label>
             <div className="grid grid-cols-3 gap-2">
-              {[
-                { id: 1, label: 'Segunda' },
-                { id: 2, label: 'Terça' },
-                { id: 3, label: 'Quarta' },
-                { id: 4, label: 'Quinta' },
-                { id: 5, label: 'Sexta' },
-                { id: 6, label: 'Sábado' }
-              ].map(d => (
+              {DIAS_SEMANA.map(d => (
                 <button
                   key={d.id}
                   type="button"
-                  onClick={() => toggleDiaSemana(d.id, remarcarDias, setRemarcarDias)}
+                  onClick={() => toggleDiaSemana(d.id, setRemarcarHorarios)}
                   className={`py-2.5 rounded-xl text-xs font-bold transition-all touch-press ${
-                    remarcarDias.includes(d.id)
+                    remarcarHorarios[d.id]
                       ? 'bg-pilates-600 text-white shadow-xs'
                       : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                   }`}
@@ -662,19 +715,20 @@ export function Alunos() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1.5">
-              Novo Horário
-            </label>
-            <select
-              value={remarcarHora}
-              onChange={(e) => setRemarcarHora(e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-300 text-base font-bold bg-white"
-            >
-              {['07:00', '08:00', '09:00', '10:00', '14:00', '15:00', '16:00', '17:00', '18:00'].map(h => (
-                <option key={h} value={h}>{h}</option>
-              ))}
-            </select>
+          <div className="space-y-2">
+            <label className="block text-sm font-bold text-slate-700">Defina um horário para cada dia</label>
+            {DIAS_SEMANA.filter((day) => remarcarHorarios[day.id]).map((day) => (
+              <div key={day.id} className="flex items-center justify-between gap-3 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                <span className="text-sm font-bold text-slate-700">{day.label}</span>
+                <input
+                  type="time"
+                  step="900"
+                  value={remarcarHorarios[day.id]}
+                  onChange={(event) => setRemarcarHorarios((current) => ({ ...current, [day.id]: event.target.value }))}
+                  className="px-4 py-2.5 rounded-xl border border-slate-300 text-base font-bold bg-white"
+                />
+              </div>
+            ))}
           </div>
 
           <div className="pt-3 flex items-center justify-end gap-3 border-t border-slate-100">
@@ -690,7 +744,56 @@ export function Alunos() {
               onClick={handleConfirmarRemarcacao}
               icon={Check}
             >
-              Confirmar Remarcação
+              Salvar Horários
+            </TouchButton>
+          </div>
+        </div>
+      </TouchModal>
+
+      {/* Modal: opções salvas para agilizar novos cadastros */}
+      <TouchModal
+        isOpen={isPlanosOpen}
+        onClose={() => setIsPlanosOpen(false)}
+        title="Planos e valores"
+      >
+        <div className="space-y-5">
+          <div>
+            <p className="text-sm font-bold text-slate-800 mb-2">Opções disponíveis</p>
+            <div className="space-y-2">
+              {planos.map((preset) => (
+                <div key={preset.id} className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+                  <div>
+                    <p className="font-bold text-slate-900">{preset.nome}</p>
+                    <p className="text-xs text-slate-500">Pagamento a cada {preset.duracao_meses} {preset.duracao_meses === 1 ? 'mês' : 'meses'}</p>
+                  </div>
+                  <span className="font-black text-pilates-700">R$ {Number(preset.valor).toFixed(2)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-t border-slate-200 pt-4 space-y-3">
+            <div>
+              <p className="font-bold text-slate-900 flex items-center gap-1.5"><Plus className="w-4 h-4" />Adicionar uma opção</p>
+              <p className="text-xs text-slate-500">Ela ficará disponível no próximo cadastro de aluno.</p>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-600 mb-1">Nome</label>
+              <input value={novoPlanoNome} onChange={(event) => setNovoPlanoNome(event.target.value)} placeholder="Ex.: Semestral" className="w-full px-3 py-2.5 rounded-xl border border-slate-300" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Meses</label>
+                <input type="number" min="1" max="60" value={novoPlanoDuracao} onChange={(event) => setNovoPlanoDuracao(event.target.value)} className="w-full px-3 py-2.5 rounded-xl border border-slate-300" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Valor do ciclo</label>
+                <input type="number" min="0.01" step="0.01" value={novoPlanoValor} onChange={(event) => setNovoPlanoValor(event.target.value)} className="w-full px-3 py-2.5 rounded-xl border border-slate-300" />
+              </div>
+            </div>
+            <TouchButton variant="primary" icon={Plus} loading={criarPlanoMutation.isPending}
+              onClick={() => criarPlanoMutation.mutate()} className="w-full">
+              Salvar nova opção
             </TouchButton>
           </div>
         </div>
@@ -731,57 +834,78 @@ export function Alunos() {
             />
           </div>
 
-          {/* Seleção Clara de Plano */}
+          {/* Escolha simples de plano; opções avançadas ficam fora do fluxo diário */}
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1.5">
-              Tipo de Plano
-            </label>
+            <label className="block text-sm font-bold text-slate-700 mb-1.5">Plano</label>
             <div className="grid grid-cols-2 gap-2.5">
+              {planos.map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => aplicarPlano(preset)}
+                  className={`p-3 rounded-xl border text-left transition-all touch-press ${
+                    selectedPresetId === preset.id
+                      ? 'border-pilates-600 bg-pilates-50 ring-2 ring-pilates-500/20'
+                      : 'border-slate-200 bg-white hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="font-bold text-slate-900 block text-sm">{preset.nome}</span>
+                  <span className="text-[11px] text-slate-500 block mt-0.5">
+                    {preset.duracao_meses} {preset.duracao_meses === 1 ? 'mês' : 'meses'} • R$ {Number(preset.valor).toFixed(2)}
+                  </span>
+                </button>
+              ))}
               <button
                 type="button"
-                onClick={() => setPlano('mensal')}
+                onClick={() => {
+                  setSelectedPresetId(null);
+                  setPlano('personalizado');
+                  setNomePlano('Personalizado');
+                  setDuracaoPlano('2');
+                }}
                 className={`p-3 rounded-xl border text-left transition-all touch-press ${
-                  plano === 'mensal'
+                  plano === 'personalizado' && !selectedPresetId
                     ? 'border-pilates-600 bg-pilates-50 ring-2 ring-pilates-500/20'
                     : 'border-slate-200 bg-white hover:bg-slate-50'
                 }`}
               >
-                <span className="font-bold text-slate-900 block text-sm">Plano Mensal</span>
-                <span className="text-[11px] text-slate-500 block mt-0.5">Sem fidelidade • Cobrança mensal</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPlano('trimestral')}
-                className={`p-3 rounded-xl border text-left transition-all touch-press ${
-                  plano === 'trimestral'
-                    ? 'border-pilates-600 bg-pilates-50 ring-2 ring-pilates-500/20'
-                    : 'border-slate-200 bg-white hover:bg-slate-50'
-                }`}
-              >
-                <span className="font-bold text-slate-900 block text-sm">Plano Trimestral</span>
-                <span className="text-[11px] text-pilates-700 font-semibold block mt-0.5">Fidelidade 3 meses • Cobrança mensal</span>
+                <span className="font-bold text-slate-900 block text-sm">Outro período</span>
+                <span className="text-[11px] text-slate-500 block mt-0.5">Escolher quantidade de meses</span>
               </button>
             </div>
-            <p className="text-[11px] text-slate-500 mt-1.5">
-              Ambos os planos possuem cobrança mensal. O plano Trimestral estabelece um compromisso inicial de 3 meses.
-            </p>
+            {plano === 'personalizado' && !selectedPresetId && (
+              <div className="grid grid-cols-2 gap-3 mt-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Nome do plano</label>
+                  <input value={nomePlano} onChange={(event) => setNomePlano(event.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-300" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Quantidade de meses</label>
+                  <input type="number" min="1" max="60" value={duracaoPlano} onChange={(event) => setDuracaoPlano(event.target.value)} className="w-full px-3 py-2.5 rounded-lg border border-slate-300" />
+                </div>
+              </div>
+            )}
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1">
-              Valor da Mensalidade (R$/mês)
-            </label>
-            <select
+            <label className="block text-sm font-bold text-slate-700 mb-1">Valor deste ciclo</label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {[180, 185, 200, 220, 555].map((quickValue) => (
+                <button key={quickValue} type="button" onClick={() => setValor(String(quickValue))}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border ${Number(valor) === quickValue ? 'bg-pilates-600 text-white border-pilates-600' : 'bg-white text-slate-600 border-slate-200'}`}>
+                  R$ {quickValue}
+                </button>
+              ))}
+            </div>
+            <input
+              type="number"
+              min="0.01"
+              step="0.01"
               value={valor}
               onChange={(e) => setValor(e.target.value)}
-              className="w-full px-3 py-3 rounded-xl border border-slate-300 text-base font-medium bg-white"
-            >
-              <option value="180">R$ 180,00/mês</option>
-              <option value="185">R$ 185,00/mês (Padrão)</option>
-              <option value="200">R$ 200,00/mês</option>
-              <option value="220">R$ 220,00/mês</option>
-            </select>
+              className="w-full px-4 py-3 rounded-xl border border-slate-300 text-lg font-bold bg-white"
+            />
+            <p className="text-[11px] text-slate-500 mt-1">O próximo pagamento será gerado após {duracaoPlano} {Number(duracaoPlano) === 1 ? 'mês' : 'meses'}.</p>
           </div>
 
           <div>
@@ -808,23 +932,16 @@ export function Alunos() {
 
           <div>
             <label className="block text-sm font-bold text-slate-700 mb-1">
-              Dias das Aulas
+              Dias e horários das aulas
             </label>
             <div className="grid grid-cols-3 gap-2">
-              {[
-                { id: 1, label: 'Segunda' },
-                { id: 2, label: 'Terça' },
-                { id: 3, label: 'Quarta' },
-                { id: 4, label: 'Quinta' },
-                { id: 5, label: 'Sexta' },
-                { id: 6, label: 'Sábado' }
-              ].map(d => (
+              {DIAS_SEMANA.map(d => (
                 <button
                   key={d.id}
                   type="button"
-                  onClick={() => toggleDiaSemana(d.id, selectedDias, setSelectedDias)}
+                  onClick={() => toggleDiaSemana(d.id, setHorariosPorDia)}
                   className={`py-2 rounded-xl text-xs font-bold transition-all touch-press ${
-                    selectedDias.includes(d.id)
+                    horariosPorDia[d.id]
                       ? 'bg-emerald-600 text-white shadow-xs'
                       : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                   }`}
@@ -835,19 +952,15 @@ export function Alunos() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-bold text-slate-700 mb-1">
-              Horário das Aulas
-            </label>
-            <select
-              value={horarioAula}
-              onChange={(e) => setHorarioAula(e.target.value)}
-              className="w-full px-3 py-3 rounded-xl border border-slate-300 text-base font-medium bg-white"
-            >
-              {['07:00', '08:00', '09:00', '10:00', '14:00', '15:00', '16:00', '17:00', '18:00'].map(h => (
-                <option key={h} value={h}>{h}</option>
-              ))}
-            </select>
+          <div className="space-y-2">
+            {DIAS_SEMANA.filter((day) => horariosPorDia[day.id]).map((day) => (
+              <div key={day.id} className="flex items-center justify-between gap-3 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                <span className="text-sm font-bold text-slate-700">{day.label}</span>
+                <input type="time" step="900" value={horariosPorDia[day.id]}
+                  onChange={(event) => setHorariosPorDia((current) => ({ ...current, [day.id]: event.target.value }))}
+                  className="px-4 py-2.5 rounded-xl border border-slate-300 text-base font-bold bg-white" />
+              </div>
+            ))}
           </div>
 
           <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">

@@ -1,0 +1,16 @@
+{
+  "appId": "com.dynamicpilates.app",
+  "appName": "Dynamic Pilates",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "CapacitorSQLite": {
+      "androidIsEncryption": false
+    }
+  }
+}

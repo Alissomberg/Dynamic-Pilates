@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../services/api.js';
+import { api, dateUtils } from '../services/api.js';
 import { StatusBadge } from '../components/StatusBadge.jsx';
 import { TouchButton } from '../components/TouchButton.jsx';
 import { TouchModal } from '../components/TouchModal.jsx';
@@ -21,7 +21,7 @@ import {
 
 export function Inicio({ onNavigate }) {
   const queryClient = useQueryClient();
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = dateUtils.localDateString();
 
   const [selectedHorario, setSelectedHorario] = useState(null);
   const [pagamentoModalAluno, setPagamentoModalAluno] = useState(null);
@@ -149,7 +149,7 @@ export function Inicio({ onNavigate }) {
             R$ {Number(financeiroMes.totalRecebido || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </p>
           <p className="text-xs text-emerald-600 font-medium mt-1">
-            {financeiroMes.qtdPagamentos || 0} mensalidades pagas
+            {financeiroMes.qtdPagamentos || 0} pagamentos recebidos
           </p>
         </div>
 
@@ -229,7 +229,7 @@ export function Inicio({ onNavigate }) {
                       : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                   }`}
                 >
-                  {h.horario}
+                  {h.horario} <span className="text-[10px] font-medium opacity-80">{h.periodoLabel}</span>
                   <span className={`ml-1.5 text-xs px-2 py-0.5 rounded-full ${
                     (horarioAtual?.horario === h.horario) ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-600'
                   }`}>
@@ -345,7 +345,7 @@ export function Inicio({ onNavigate }) {
                   <div>
                     <h4 className="font-bold text-slate-900 text-base">{item.alunoNome}</h4>
                     <p className="text-xs text-slate-500">
-                      Vence Hoje (31/08) • R$ {item.valorEsperado} • Plano {item.tipoPlano}
+                      Vence hoje ({new Date(item.dataVencimento + 'T00:00:00').toLocaleDateString('pt-BR')}) • R$ {item.valorEsperado} • {item.nomePlano}
                     </p>
                   </div>
                 </div>
@@ -382,7 +382,7 @@ export function Inicio({ onNavigate }) {
                   
                   {item.telefone && (
                     <a
-                      href={`https://wa.me/55${item.telefone.replace(/\D/g, '')}?text=Olá%20${encodeURIComponent(item.alunoNome)},%20passando%20para%20lembrar%20do%20pagamento%20da%20mensalidade%20do%20Pilates%20(R$%20${item.valorEsperado}).`}
+                      href={`https://wa.me/55${item.telefone.replace(/\D/g, '')}?text=Olá%20${encodeURIComponent(item.alunoNome)},%20passando%20para%20lembrar%20do%20pagamento%20do%20seu%20plano%20de%20Pilates%20(R$%20${item.valorEsperado}).`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-colors"
@@ -426,7 +426,7 @@ export function Inicio({ onNavigate }) {
               <p className="text-xs text-slate-500 uppercase font-semibold">Aluno</p>
               <h4 className="text-lg font-bold text-slate-900">{pagamentoModalAluno.alunoNome}</h4>
               <p className="text-xs text-slate-500 mt-1 capitalize">
-                Plano {pagamentoModalAluno.tipoPlano} • Vencimento: dia {pagamentoModalAluno.diaVencimento}
+                {pagamentoModalAluno.nomePlano} • Vencimento: dia {pagamentoModalAluno.diaVencimento}
               </p>
             </div>
 

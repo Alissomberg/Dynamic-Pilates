@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../services/api.js';
+import { api, dateUtils } from '../services/api.js';
 import { StatusBadge } from '../components/StatusBadge.jsx';
 import { TouchButton } from '../components/TouchButton.jsx';
 import { 
@@ -17,7 +17,7 @@ import {
 
 export function Presenca() {
   const queryClient = useQueryClient();
-  const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(() => dateUtils.localDateString());
   const [selectedHorario, setSelectedHorario] = useState(null);
 
   // Carregar dados de presença do dia selecionado
@@ -67,12 +67,12 @@ export function Presenca() {
   const handleMudarDia = (dias) => {
     const d = new Date(selectedDate + 'T12:00:00');
     d.setDate(d.getDate() + dias);
-    setSelectedDate(d.toISOString().split('T')[0]);
+    setSelectedDate(dateUtils.localDateString(d));
     setSelectedHorario(null);
   };
 
   const handleIrHoje = () => {
-    setSelectedDate(new Date().toISOString().split('T')[0]);
+    setSelectedDate(dateUtils.localDateString());
     setSelectedHorario(null);
   };
 
@@ -83,7 +83,7 @@ export function Presenca() {
     year: 'numeric'
   });
 
-  const isToday = selectedDate === new Date().toISOString().split('T')[0];
+  const isToday = selectedDate === dateUtils.localDateString();
   const gradeHorarios = presencaDia?.horarios || [];
 
   return (
@@ -170,9 +170,18 @@ export function Presenca() {
         </div>
       ) : gradeHorarios.length > 0 ? (
         <div className="space-y-4">
-          {gradeHorarios.map(bloco => (
-            <div 
-              key={bloco.horario} 
+          {gradeHorarios.map((bloco, index) => (
+            <React.Fragment key={bloco.horario}>
+            {(index === 0 || gradeHorarios[index - 1]?.periodo !== bloco.periodo) && (
+              <div className="pt-2 flex items-center gap-3">
+                <div className={`h-px flex-1 ${bloco.periodo === 'manha' ? 'bg-amber-200' : 'bg-indigo-200'}`} />
+                <h3 className={`text-sm font-black uppercase tracking-wider ${bloco.periodo === 'manha' ? 'text-amber-700' : 'text-indigo-700'}`}>
+                  Turmas da {bloco.periodoLabel || (bloco.periodo === 'manha' ? 'Manhã' : 'Tarde')}
+                </h3>
+                <div className={`h-px flex-1 ${bloco.periodo === 'manha' ? 'bg-amber-200' : 'bg-indigo-200'}`} />
+              </div>
+            )}
+            <div
               className="bg-white rounded-2xl border border-slate-200/80 shadow-card overflow-hidden transition-all"
             >
               {/* Header do Horário com status do bloco */}
@@ -265,6 +274,7 @@ export function Presenca() {
                 ))}
               </div>
             </div>
+            </React.Fragment>
           ))}
         </div>
       ) : (

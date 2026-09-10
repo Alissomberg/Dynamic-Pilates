@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../services/api.js';
+import { api, dateUtils } from '../services/api.js';
 import { StatusBadge } from '../components/StatusBadge.jsx';
 import { TouchButton } from '../components/TouchButton.jsx';
 import { TouchModal } from '../components/TouchModal.jsx';
@@ -18,7 +18,7 @@ import {
 
 export function Financeiro() {
   const queryClient = useQueryClient();
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = dateUtils.localDateString();
   const mesAtualStr = todayStr.substring(0, 7);
 
   // Estados do Modal de Baixa de Pagamento
@@ -82,7 +82,7 @@ export function Financeiro() {
       <div>
         <h2 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
           <DollarSign className="w-6 h-6 text-pilates-600" />
-          Controle Financeiro & Mensalidades
+          Controle Financeiro
         </h2>
         <p className="text-xs sm:text-sm text-slate-500">
           Acompanhe recebimentos, pendências e dê baixa em pagamentos com 1 toque
@@ -120,7 +120,7 @@ export function Financeiro() {
               R$ {Number(resumoMes.totalAtrasado || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
             </p>
             <p className="text-xs text-rose-600 font-medium mt-1">
-              {resumoMes.qtdAtrasados} mensalidades vencidas
+              {resumoMes.qtdAtrasados} cobranças vencidas
             </p>
           </div>
 
@@ -142,13 +142,13 @@ export function Financeiro() {
         </div>
       )}
 
-      {/* Lista de Mensalidades em Atraso e Vencendo */}
+      {/* Lista de cobranças em atraso e vencendo */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-card p-5 sm:p-6">
         <div className="flex items-center justify-between pb-4 border-b border-slate-100">
           <div>
             <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
               <AlertCircle className="w-5 h-5 text-rose-600" />
-              Mensalidades Pendentes & Cobranças ({pendencias.length})
+              Cobranças Pendentes ({pendencias.length})
             </h3>
             <p className="text-xs text-slate-500">
               Alunos ordenados pelos vencimentos mais urgentes
@@ -175,7 +175,7 @@ export function Financeiro() {
                   <div>
                     <h4 className="font-bold text-slate-900 text-base">{item.alunoNome}</h4>
                     <p className="text-xs text-slate-500 capitalize">
-                      Plano {item.tipoPlano} • Vencimento: dia {item.diaVencimento} ({new Date(item.dataVencimento + 'T00:00:00').toLocaleDateString('pt-BR')})
+                      {item.nomePlano} • Vencimento: dia {item.diaVencimento} ({new Date(item.dataVencimento + 'T00:00:00').toLocaleDateString('pt-BR')})
                     </p>
                   </div>
                 </div>
@@ -192,7 +192,7 @@ export function Financeiro() {
 
                   {item.telefone && (
                     <a
-                      href={`https://wa.me/55${item.telefone.replace(/\D/g, '')}?text=Olá%20${encodeURIComponent(item.alunoNome)},%20passando%20para%20lembrar%20do%20pagamento%20da%20mensalidade%20do%20Pilates%20(R$%20${item.valorEsperado}).`}
+                      href={`https://wa.me/55${item.telefone.replace(/\D/g, '')}?text=Olá%20${encodeURIComponent(item.alunoNome)},%20passando%20para%20lembrar%20do%20pagamento%20do%20seu%20plano%20de%20Pilates%20(R$%20${item.valorEsperado}).`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="p-2.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-colors"
@@ -221,7 +221,7 @@ export function Financeiro() {
         ) : (
           <div className="py-12 text-center text-slate-500">
             <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-2" />
-            <h4 className="font-bold text-slate-700 text-base">Todas as mensalidades estão em dia!</h4>
+            <h4 className="font-bold text-slate-700 text-base">Todas as cobranças estão em dia!</h4>
             <p className="text-xs text-slate-400 mt-1">Nenhum aluno com pendências no momento.</p>
           </div>
         )}
@@ -257,7 +257,7 @@ export function Financeiro() {
                   <div>
                     <h4 className="font-bold text-slate-900">{p.aluno_nome}</h4>
                     <p className="text-xs text-slate-500">
-                      Pago em {new Date(p.data_pagamento + 'T00:00:00').toLocaleDateString('pt-BR')} • {p.observacao || 'Mensalidade'}
+                      Pago em {new Date(p.data_pagamento + 'T00:00:00').toLocaleDateString('pt-BR')} • {p.observacao || p.nome_plano || 'Plano'}
                     </p>
                   </div>
                 </div>
@@ -292,7 +292,7 @@ export function Financeiro() {
               <p className="text-xs text-slate-500 uppercase font-semibold">Aluno</p>
               <h4 className="text-lg font-bold text-slate-900">{pagamentoModalAluno.alunoNome}</h4>
               <p className="text-xs text-slate-500 mt-1 capitalize">
-                Plano {pagamentoModalAluno.tipoPlano} • Vencimento: dia {pagamentoModalAluno.diaVencimento}
+                {pagamentoModalAluno.nomePlano} • Vencimento: dia {pagamentoModalAluno.diaVencimento}
               </p>
             </div>
 
