@@ -2,11 +2,44 @@ import {
   exportDatabase,
   importDatabase,
   inTransaction,
+  loadMockData as loadMockDatabase,
   query,
+  resetOperationalData as resetOperationalDatabase,
   run
 } from '../db/localDatabase.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+let currentAccount = null;
+
+function setCurrentAccount(account) {
+  currentAccount = account || null;
+}
+
+function requireAccount() {
+  if (!currentAccount?.userId) throw new Error('Faça login novamente para acessar os dados.');
+  return currentAccount;
+}
+
+function scopeOwnerId() {
+  const account = requireAccount();
+  if (account.role === 'admin') return null;
+  return account.role === 'manager' ? Number(account.userId) : Number(account.createdBy || account.userId);
+}
+
+function studentScope(column = 'owner_user_id') {
+  const ownerId = scopeOwnerId();
+  return ownerId ? { clause: ` AND ${column} = ?`, params: [ownerId] } : { clause: '', params: [] };
+}
+
+async function assertStudentAccess(studentId) {
+  const scope = studentScope('owner_user_id');
+  const rows = await query(`SELECT id FROM alunos WHERE id = ?${scope.clause}`, [Number(studentId), ...scope.params]);
+  if (!rows[0]) throw new Error('Aluno não encontrado ou sem permissão para este usuário.');
+}
+
+function requireAdmin() {
+  if (requireAccount().role !== 'admin') throw new Error('Apenas o Admin pode executar esta ação.');
+}
 
 function localDateString(date = new Date()) {
   const year = date.getFullYear();
@@ -147,7 +180,9 @@ async function getStudentView(student) {
 
 async function getAlunos({ search = '', status = 'todos' } = {}) {
   const params = [];
-  let sql = 'SELECT id, nome, telefone, observacoes, ativo, criado_em FROM alunos WHERE ativo = 1';
+  const scope = studentScope('owner_user_id');
+  let sql = `SELECT id, owner_user_id, nome, telefone, observacoes, ativo, criado_em FROM alunos WHERE ativo = 1${scope.clause}`;
+  params.push(...scope.params);
   if (search.trim()) {
     sql += ' AND LOWER(nome) LIKE ?';
     params.push(`%${search.trim().toLowerCase()}%`);
@@ -160,7 +195,8 @@ async function getAlunos({ search = '', status = 'todos' } = {}) {
 }
 
 async function getAlunoById(id) {
-  const rows = await query('SELECT id, nome, telefone, observacoes, ativo, criado_em FROM alunos WHERE id = ?', [Number(id)]);
+  const scope = studentScope('owner_user_id');
+  const rows = await query(`SELECT id, owner_user_id, nome, telefone, observacoes, ativo, criado_em FROM alunos WHERE id = ?${scope.clause}`, [Number(id), ...scope.params]);
   if (!rows[0]) throw new Error('Aluno não encontrado.');
   return getStudentView(rows[0]);
 }
@@ -175,11 +211,12 @@ async function createAluno(data) {
   if (!Number.isInteger(dueDay) || dueDay < 1 || dueDay > 31) throw new Error('Escolha um dia de vencimento válido.');
   const startDate = data.data_inicio || localDateString();
   const createdAt = new Date().toISOString();
+  const ownerUserId = scopeOwnerId() || Number(requireAccount().userId);
 
   const studentId = await inTransaction(async (db) => {
     const studentChange = await db.run(
-      'INSERT INTO alunos (nome, telefone, observacoes, ativo, criado_em) VALUES (?, ?, ?, 1, ?)',
-      [name, String(data.telefone || '').trim(), String(data.observacoes || '').trim(), createdAt], false
+      'INSERT INTO alunos (owner_user_id, nome, telefone, observacoes, ativo, criado_em) VALUES (?, ?, ?, ?, 1, ?)',
+      [ownerUserId, name, String(data.telefone || '').trim(), String(data.observacoes || '').trim(), createdAt], false
     );
     const newStudentId = Number(studentChange.changes.lastId);
     const contractChange = await db.run(
@@ -232,7 +269,7 @@ async function updateAlunoHorarios(id, schedules) {
 
 async function getAlunoHistoricoMensal(id, month = localDateString().slice(0, 7)) {
   const studentId = Number(id);
-  if (!(await query('SELECT id FROM alunos WHERE id = ?', [studentId]))[0]) throw new Error('Aluno não encontrado.');
+  await assertStudentAccess(studentId);
   const [charges, payments, attendances] = await Promise.all([
     query('SELECT id, competencia, data_vencimento, valor_centavos, status FROM cobrancas WHERE aluno_id = ? AND competencia = ? ORDER BY data_vencimento', [studentId, month]),
     query(`SELECT p.id, p.data_pagamento, p.valor_centavos, p.forma_pagamento,
@@ -283,14 +320,15 @@ function periodForTime(time) {
 
 async function getPresencasDia(date = localDateString()) {
   const day = weekDay(date);
+  const scope = studentScope('a.owner_user_id');
   const rows = await query(
     `SELECT h.horario, h.dia_semana, a.id AS aluno_id, a.nome AS aluno_nome,
       a.telefone, c.nome_plano, p.id AS presenca_id, p.status AS presenca_status
       FROM aluno_horarios h JOIN alunos a ON a.id = h.aluno_id AND a.ativo = 1
       LEFT JOIN contratos c ON c.aluno_id = a.id AND c.ativo = 1
       LEFT JOIN presencas p ON p.aluno_id = a.id AND p.data = ? AND p.horario = h.horario
-      WHERE h.dia_semana = ? ORDER BY h.horario, a.nome COLLATE NOCASE`,
-    [date, day]
+      WHERE h.dia_semana = ?${scope.clause} ORDER BY h.horario, a.nome COLLATE NOCASE`,
+    [date, day, ...scope.params]
   );
   const blocks = new Map();
   for (const row of rows) {
@@ -319,6 +357,7 @@ async function getPresencasDia(date = localDateString()) {
 
 async function checkinPresenca({ alunoId, data, horario, status }) {
   if (!['presente', 'falta'].includes(status)) throw new Error('Escolha Presente ou Falta.');
+  await assertStudentAccess(alunoId);
   await run(`INSERT INTO presencas (aluno_id, data, horario, status, criado_em)
     VALUES (?, ?, ?, ?, ?) ON CONFLICT (aluno_id, data, horario) DO UPDATE SET
     status = excluded.status, criado_em = excluded.criado_em`,
@@ -327,13 +366,15 @@ async function checkinPresenca({ alunoId, data, horario, status }) {
 }
 
 async function getPendencias() {
+  const scope = studentScope('a.owner_user_id');
   const rows = await query(
     `SELECT ch.id AS cobranca_id, ch.competencia, ch.data_vencimento, ch.valor_centavos,
       a.id AS aluno_id, a.nome AS aluno_nome, a.telefone, c.nome_plano, c.tipo_plano,
       c.duracao_plano_meses, c.dia_vencimento FROM cobrancas ch
       JOIN alunos a ON a.id = ch.aluno_id AND a.ativo = 1
       JOIN contratos c ON c.id = ch.contrato_id AND c.ativo = 1
-      WHERE ch.status = 'pendente' ORDER BY ch.data_vencimento, a.nome COLLATE NOCASE`
+      WHERE ch.status = 'pendente'${scope.clause} ORDER BY ch.data_vencimento, a.nome COLLATE NOCASE`,
+    scope.params
   );
   return Promise.all(rows.map(async (row) => {
     const payments = await query('SELECT data_pagamento, valor_centavos FROM pagamentos WHERE aluno_id = ? ORDER BY data_pagamento DESC, id DESC LIMIT 1', [row.aluno_id]);
@@ -351,6 +392,7 @@ async function getPendencias() {
 
 async function registrarPagamento({ alunoId, cobrancaId, valorPago, dataPagamento = localDateString(), formaPagamento = 'pix', observacao = '' }) {
   const studentId = Number(alunoId);
+  await assertStudentAccess(studentId);
   if (!['pix', 'dinheiro', 'cartao'].includes(formaPagamento)) throw new Error('Escolha Pix, dinheiro ou cartão.');
   const charges = cobrancaId
     ? await query("SELECT * FROM cobrancas WHERE id = ? AND aluno_id = ? AND status = 'pendente'", [Number(cobrancaId), studentId])
@@ -382,23 +424,26 @@ async function registrarPagamento({ alunoId, cobrancaId, valorPago, dataPagament
 
 async function getHistoricoFinanceiro(limit = 50) {
   const safeLimit = Math.max(1, Math.min(500, Number(limit) || 50));
+  const scope = studentScope('a.owner_user_id');
   const rows = await query(
     `SELECT p.id, p.data_pagamento, p.valor_centavos, p.forma_pagamento, p.observacao,
       p.criado_em, a.id AS aluno_id, a.nome AS aluno_nome, ch.competencia,
       ch.data_vencimento, c.nome_plano, c.duracao_plano_meses FROM pagamentos p
       JOIN alunos a ON a.id = p.aluno_id LEFT JOIN cobrancas ch ON ch.id = p.cobranca_id
       LEFT JOIN contratos c ON c.id = ch.contrato_id
-      ORDER BY p.data_pagamento DESC, p.id DESC LIMIT ?`, [safeLimit]
+      WHERE 1 = 1${scope.clause}
+      ORDER BY p.data_pagamento DESC, p.id DESC LIMIT ?`, [...scope.params, safeLimit]
   );
   return rows.map((row) => ({ ...row, valor_pago: centsToReais(row.valor_centavos) }));
 }
 
 async function getResumoFinanceiro(month = localDateString().slice(0, 7)) {
+  const scope = studentScope('a.owner_user_id');
   const [received, pending, overdue, students] = await Promise.all([
-    query('SELECT COALESCE(SUM(valor_centavos), 0) AS total, COUNT(*) AS quantidade FROM pagamentos WHERE substr(data_pagamento, 1, 7) = ?', [month]),
-    query("SELECT COALESCE(SUM(valor_centavos), 0) AS total, COUNT(*) AS quantidade FROM cobrancas WHERE status = 'pendente'"),
-    query("SELECT COALESCE(SUM(valor_centavos), 0) AS total, COUNT(*) AS quantidade FROM cobrancas WHERE status = 'pendente' AND data_vencimento < ?", [localDateString()]),
-    query('SELECT COUNT(*) AS quantidade FROM alunos WHERE ativo = 1')
+    query(`SELECT COALESCE(SUM(p.valor_centavos), 0) AS total, COUNT(*) AS quantidade FROM pagamentos p JOIN alunos a ON a.id = p.aluno_id WHERE substr(p.data_pagamento, 1, 7) = ?${scope.clause}`, [month, ...scope.params]),
+    query(`SELECT COALESCE(SUM(ch.valor_centavos), 0) AS total, COUNT(*) AS quantidade FROM cobrancas ch JOIN alunos a ON a.id = ch.aluno_id WHERE ch.status = 'pendente'${scope.clause}`, scope.params),
+    query(`SELECT COALESCE(SUM(ch.valor_centavos), 0) AS total, COUNT(*) AS quantidade FROM cobrancas ch JOIN alunos a ON a.id = ch.aluno_id WHERE ch.status = 'pendente' AND ch.data_vencimento < ?${scope.clause}`, [localDateString(), ...scope.params]),
+    query(`SELECT COUNT(*) AS quantidade FROM alunos a WHERE a.ativo = 1${scope.clause}`, scope.params)
   ]);
   return { competencia: month, totalRecebido: centsToReais(received[0]?.total), qtdPagamentos: Number(received[0]?.quantidade || 0),
     totalPendente: centsToReais(pending[0]?.total), qtdPendencias: Number(pending[0]?.quantidade || 0),
@@ -443,11 +488,22 @@ async function importBackup(backup) {
   return importDatabase(backup.database);
 }
 
+async function resetOperationalData() {
+  requireAdmin();
+  return resetOperationalDatabase();
+}
+
+async function loadMockData() {
+  requireAdmin();
+  return loadMockDatabase();
+}
+
 export const api = {
+  setCurrentAccount,
   getDashboard, getAlunos, getAlunoById, getAlunoHistoricoMensal, updateAlunoHorarios,
   createAluno, updateAluno, getPresencasDia, checkinPresenca, getPendencias,
   getHistoricoFinanceiro, getResumoFinanceiro, registrarPagamento, getPlanPresets,
-  createPlanPreset, exportBackup, importBackup
+  createPlanPreset, exportBackup, importBackup, resetOperationalData, loadMockData
 };
 
 export const dateUtils = { localDateString, addMonths, financialStatus };

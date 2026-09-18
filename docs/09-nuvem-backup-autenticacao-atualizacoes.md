@@ -4,23 +4,23 @@
 
 O aplicativo atual é totalmente independente. A autenticação, o banco operacional, o backup e a restauração funcionam no dispositivo sem chamadas HTTP. A camada de nuvem descrita anteriormente está pausada para uma futura versão.
 
-## PIN e token de plano
+## PIN e perfis locais
 
 - todos os usuários entram com um PIN numérico de 6 dígitos;
-- o SQLite guarda somente o hash do PIN;
-- somente o admin registra tokens;
-- o SQLite guarda somente o hash do token e os metadados do usuário;
-- tokens novos têm 24 caracteres URL-safe;
-- o valor completo aparece uma única vez para ser copiado pela equipe técnica;
-- receber um token transforma o usuário em SuperUser com direito a cadastrar até dois afiliados;
-- afiliados recebem PIN, não recebem token e não podem cadastrar outros usuários;
+- o SQLite guarda somente o derivado PBKDF2 do PIN, com salt aleatório e 120 mil iterações;
+- não existem tokens de acesso ou de plano no aplicativo;
+- o Admin cria contas SuperUser;
+- cada SuperUser pode cadastrar até dois afiliados;
+- afiliados não podem cadastrar outros usuários;
+- SuperUser e afiliados compartilham os alunos do mesmo grupo;
+- o Admin pode consultar e alterar os alunos de todos os grupos;
+- somente o Admin pode zerar os dados operacionais ou carregar os dados mock;
 - o login consulta apenas o SQLite local.
 
 ### Perfis iniciais
 
-- Admin — PIN `731946`: vê todos os usuários e registra tokens;
+- Admin — PIN `731946`: vê todos os usuários e alunos, cria SuperUsers e controla a base;
 - Doutor João — PIN `482615`: primeiro SuperUser, com limite de dois afiliados;
-- token inicial do Doutor João: `zello_joao_2026_superusr`.
 
 Esses PINs são dados iniciais para teste e implantação.
 

@@ -5,19 +5,20 @@ import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import {
   BadgeCheck,
-  Check,
-  Copy,
+  Database,
   Download,
   HardDrive,
   KeyRound,
   LogOut,
   MessageCircle,
+  RefreshCcw,
   Save,
   Settings,
+  Trash2,
   Upload
 } from 'lucide-react';
 import { api } from '../services/api.js';
-import { createLocalToken, createLocalUser, listLocalUsers } from '../services/localAuth.js';
+import { createLocalUser, listLocalUsers } from '../services/localAuth.js';
 import { TouchButton } from '../components/TouchButton.jsx';
 
 const SUPPORT_PHONE = '5581920025567';
@@ -36,13 +37,10 @@ function roleLabel(role) {
 export function Configuracoes({ auth, onLogout }) {
   const [message, setMessage] = useState('');
   const [processing, setProcessing] = useState('');
-  const [createdToken, setCreatedToken] = useState('');
-  const [copied, setCopied] = useState(false);
   const [users, setUsers] = useState([]);
   const [newUsername, setNewUsername] = useState('');
   const [newUserName, setNewUserName] = useState('');
   const [newUserPin, setNewUserPin] = useState('');
-  const [selectedUserId, setSelectedUserId] = useState('');
   const account = auth.account;
   const canManageUsers = account.role === 'admin' || account.role === 'manager';
   const isAdmin = account.role === 'admin';
@@ -51,8 +49,6 @@ export function Configuracoes({ auth, onLogout }) {
     if (!canManageUsers) return;
     listLocalUsers(account).then((items) => {
       setUsers(items);
-      const firstTokenCandidate = items.find((item) => item.role !== 'admin');
-      if (!selectedUserId && firstTokenCandidate) setSelectedUserId(String(firstTokenCandidate.id));
     }).catch((error) => setMessage(error.message));
   }, [account.id, account.role]);
 
@@ -124,7 +120,7 @@ export function Configuracoes({ auth, onLogout }) {
       setNewUserName('');
       setNewUserPin('');
       setUsers(await listLocalUsers(account));
-      setMessage('Usuário local criado. Entregue o PIN com segurança.');
+      setMessage(`${isAdmin ? 'SuperUser' : 'Afiliado'} criado. Entregue o PIN com segurança.`);
     } catch (error) {
       setMessage(`Não foi possível criar o usuário: ${error.message}`);
     } finally {
@@ -132,37 +128,32 @@ export function Configuracoes({ auth, onLogout }) {
     }
   };
 
-  const registerToken = async () => {
-    setProcessing('token');
+  const resetData = async () => {
+    if (!window.confirm('Isso apagará alunos, contratos, cobranças, pagamentos e presenças. Os usuários e PINs serão mantidos. Deseja continuar?')) return;
+    setProcessing('reset');
     setMessage('');
     try {
-      const result = await createLocalToken(account, Number(selectedUserId));
-      setCreatedToken(result.token);
-      setUsers(await listLocalUsers(account));
-      setMessage('Token local criado. Ele será exibido somente agora; copie e guarde com segurança.');
+      await api.resetOperationalData();
+      setMessage('Dados operacionais zerados. Recarregando o Zello…');
+      window.setTimeout(() => window.location.reload(), 700);
     } catch (error) {
-      setMessage(`Não foi possível criar o token: ${error.message}`);
-    } finally {
+      setMessage(`Não foi possível zerar os dados: ${error.message}`);
       setProcessing('');
     }
   };
 
-  const copyToken = async () => {
-    if (!createdToken) return;
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(createdToken);
-    } else {
-      const helper = document.createElement('textarea');
-      helper.value = createdToken;
-      helper.style.position = 'fixed';
-      helper.style.opacity = '0';
-      document.body.appendChild(helper);
-      helper.select();
-      document.execCommand('copy');
-      helper.remove();
+  const installMockData = async () => {
+    if (!window.confirm('Os dados atuais serão substituídos pelos dados fictícios de demonstração. Deseja continuar?')) return;
+    setProcessing('mock');
+    setMessage('');
+    try {
+      await api.loadMockData();
+      setMessage('Dados de demonstração carregados. Recarregando o Zello…');
+      window.setTimeout(() => window.location.reload(), 700);
+    } catch (error) {
+      setMessage(`Não foi possível carregar os dados de demonstração: ${error.message}`);
+      setProcessing('');
     }
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1500);
   };
 
   return (
@@ -171,7 +162,7 @@ export function Configuracoes({ auth, onLogout }) {
         <h2 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
           <Settings className="w-6 h-6 text-pilates-600" /> Ajustes
         </h2>
-        <p className="text-sm text-slate-500">Dados, tokens e cópias de segurança locais.</p>
+        <p className="text-sm text-slate-500">Dados, usuários, PINs e cópias de segurança locais.</p>
       </div>
 
       <section className="bg-white rounded-2xl border border-slate-200 shadow-card p-5 sm:p-6">
@@ -205,31 +196,23 @@ export function Configuracoes({ auth, onLogout }) {
           <input value={newUserName} onChange={(event) => setNewUserName(event.target.value)} placeholder="Nome completo" className="min-h-[50px] rounded-xl border border-slate-300 px-4 outline-none focus:border-pilates-600 focus:ring-2 focus:ring-pilates-100" />
           <input type="password" inputMode="numeric" maxLength={6} value={newUserPin} onChange={(event) => setNewUserPin(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="PIN de 6 números" className="min-h-[50px] rounded-xl border border-slate-300 px-4 outline-none focus:border-pilates-600 focus:ring-2 focus:ring-pilates-100" />
         </div>
-        <TouchButton icon={KeyRound} onClick={registerUser} loading={processing === 'user'} disabled={Boolean(processing)} className="w-full mt-3">Cadastrar usuário</TouchButton>
+        <TouchButton icon={KeyRound} onClick={registerUser} loading={processing === 'user'} disabled={Boolean(processing)} className="w-full mt-3">Cadastrar {isAdmin ? 'SuperUser' : 'afiliado'}</TouchButton>
         <div className="mt-5 rounded-xl border border-slate-200 overflow-hidden">
           <div className="bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">Usuários cadastrados</div>
-          {users.map((user) => <div key={user.id} className="px-3 py-2 border-t border-slate-100 text-sm flex flex-wrap gap-x-3 gap-y-1"><span className="font-semibold">{user.display_name}</span><span className="text-slate-500">@{user.username}</span><span className="text-slate-500">{roleLabel(user.role)}</span><span className="text-slate-500">tokens: {user.token_count}</span></div>)}
+          {users.map((user) => <div key={user.id} className="px-3 py-2 border-t border-slate-100 text-sm flex flex-wrap gap-x-3 gap-y-1"><span className="font-semibold">{user.display_name}</span><span className="text-slate-500">@{user.username}</span><span className="text-slate-500">{roleLabel(user.role)}</span>{user.creator_username && <span className="text-slate-400">criado por @{user.creator_username}</span>}</div>)}
         </div>
-        {isAdmin && <div className="mt-5 border-t border-slate-200 pt-4">
-          <p className="text-sm font-semibold text-slate-800 mb-2">Registrar token para um usuário</p>
-          <div className="grid sm:grid-cols-[1fr_auto] gap-3">
-            <select value={selectedUserId} onChange={(event) => setSelectedUserId(event.target.value)} className="min-h-[50px] rounded-xl border border-slate-300 px-4 bg-white">
-              {users.filter((user) => user.role !== 'admin').map((user) => <option key={user.id} value={user.id}>{user.display_name} (@{user.username})</option>)}
-            </select>
-            <TouchButton icon={KeyRound} onClick={registerToken} loading={processing === 'token'} disabled={Boolean(processing) || !selectedUserId}>Criar token</TouchButton>
-          </div>
-        </div>}
-        {createdToken && (
-          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
-            <p className="text-xs font-semibold text-amber-900 mb-2">Token criado — copie agora:</p>
-            <div className="flex gap-2 items-center">
-              <code className="flex-1 min-w-0 break-all rounded-lg bg-white border border-amber-200 px-3 py-2 text-sm text-slate-800">{createdToken}</code>
-              <button type="button" onClick={copyToken} className="shrink-0 rounded-lg border border-amber-300 p-2 text-amber-800 hover:bg-amber-100" aria-label="Copiar token">
-                {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
-              </button>
-            </div>
-          </div>
-        )}
+      </section>}
+
+      {isAdmin && <section className="bg-white rounded-2xl border border-rose-200 shadow-card p-5 sm:p-6">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="w-11 h-11 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0"><Database className="w-5 h-5" /></div>
+          <div><h3 className="font-bold text-slate-900">Controle dos dados</h3><p className="text-sm text-slate-500 mt-1">Somente o Admin pode zerar a base ou substituir os dados atuais pela demonstração.</p></div>
+        </div>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <TouchButton variant="outline" icon={RefreshCcw} onClick={installMockData} loading={processing === 'mock'} disabled={Boolean(processing)}>Carregar dados mock</TouchButton>
+          <TouchButton variant="danger" icon={Trash2} onClick={resetData} loading={processing === 'reset'} disabled={Boolean(processing)}>Zerar dados</TouchButton>
+        </div>
+        <p className="text-xs text-slate-500 mt-3">Essas ações não apagam Admin, SuperUsers, afiliados nem seus PINs.</p>
       </section>}
 
       <section className="bg-white rounded-2xl border border-slate-200 shadow-card p-5">

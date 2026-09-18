@@ -1,6 +1,6 @@
 # Zello
 
-Aplicativo Android offline-first para gestão de estúdios. Alunos, horários, presenças, planos, pagamentos e tokens ficam no SQLite do próprio dispositivo. O aplicativo não depende de servidor para abrir, autenticar ou operar.
+Aplicativo Android offline-first para gestão de estúdios. Alunos, horários, presenças, planos, pagamentos, usuários e PINs ficam no SQLite do próprio dispositivo. O aplicativo não depende de servidor para abrir, autenticar ou operar.
 
 ## Desenvolvimento
 
@@ -19,10 +19,10 @@ Todos os usuários entram com um PIN numérico de 6 dígitos. Contas iniciais:
 
 | Perfil | PIN | Permissão |
 |---|---|---|
-| Admin | `731946` | vê todos os usuários e registra tokens |
-| Doutor João | `482615` | SuperUser com token e até 2 afiliados |
+| Admin | `731946` | vê todos os usuários e alunos, cria SuperUsers e controla os dados |
+| Doutor João | `482615` | SuperUser que pode criar até 2 afiliados |
 
-O token inicial do Doutor João é `zello_joao_2026_superusr`. O token define o plano de SuperUser; ele não é usado na tela de login. Afiliados criados pelo SuperUser recebem apenas um PIN e não podem criar outros usuários.
+Não existem mais tokens. Cada usuário possui um PIN individual, protegido com PBKDF2, salt aleatório e 120 mil iterações. O Admin cria SuperUsers; cada SuperUser pode criar até dois afiliados. SuperUser e afiliados compartilham os alunos do mesmo grupo, enquanto o Admin pode consultar e alterar os alunos de todos os grupos. Somente o Admin pode zerar os dados ou carregar a base fictícia de demonstração.
 
 ## Android
 

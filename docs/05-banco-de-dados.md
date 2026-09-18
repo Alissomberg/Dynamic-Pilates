@@ -4,7 +4,7 @@
 
 No Android, `@capacitor-community/sqlite` usa SQLite nativo no dispositivo. No navegador de desenvolvimento, `jeep-sqlite` mantém a mesma base em IndexedDB. Não há banco hospedado nem conexão obrigatória com servidor.
 
-O schema atual tem versão `3` e fica em `client/src/db/localDatabase.js`.
+O schema atual tem versão `4` e fica em `client/src/db/localDatabase.js`.
 
 ## Tabelas
 
@@ -12,10 +12,9 @@ O schema atual tem versão `3` e fica em `client/src/db/localDatabase.js`.
 |---|---|
 | `schema_migrations` | versão aplicada do schema |
 | `settings` | configurações futuras por chave/valor |
-| `local_users` | usuários locais, PIN com hash, perfil e cota de afiliados |
-| `access_tokens` | tokens locais, hash, usuário e status de acesso |
+| `local_users` | usuários locais, PIN protegido com PBKDF2, perfil e cota de afiliados |
 | `plan_presets` | opções frequentes de nome, meses e valor |
-| `alunos` | dados pessoais e status ativo |
+| `alunos` | dados pessoais, status e grupo SuperUser responsável |
 | `contratos` | plano, recorrência, valor e vencimento |
 | `aluno_horarios` | horário independente por aluno e dia |
 | `cobrancas` | ciclos pendentes, pagos ou cancelados |
@@ -51,7 +50,8 @@ Em um banco vazio são criados:
 - Trimestral: 3 meses, R$ 555.
 - três alunos fictícios para demonstração, com contratos, cobranças, pagamentos e presenças;
 - uma conta admin com PIN de 6 dígitos;
-- o Doutor João como primeiro SuperUser, com token e limite de dois afiliados.
+- o Doutor João como primeiro SuperUser, com limite de dois afiliados;
+- os alunos ligados ao SuperUser responsável pelo grupo.
 
 Os dados de demonstração só são incluídos quando ainda não há alunos no banco. O servidor legado não participa desse seed.
 

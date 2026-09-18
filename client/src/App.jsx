@@ -21,6 +21,7 @@ const queryClient = new QueryClient({
 });
 
 function MainApp({ auth, onLogout }) {
+  api.setCurrentAccount(auth.account);
   const [activeTab, setActiveTab] = useState('inicio');
 
   // Contagem de alertas para badge
@@ -88,6 +89,7 @@ export function App() {
   };
 
   const logout = () => {
+    api.setCurrentAccount(null);
     clearAuth();
     queryClient.clear();
     setState({ loading: false, auth: null, error: '' });

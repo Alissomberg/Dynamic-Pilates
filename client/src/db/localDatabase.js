@@ -5,7 +5,7 @@ import {
 } from '@capacitor-community/sqlite';
 
 const DATABASE_NAME = 'dynamic_pilates';
-const DATABASE_VERSION = 3;
+const DATABASE_VERSION = 4;
 
 const sqlite = new SQLiteConnection(CapacitorSQLite);
 let connectionPromise;
@@ -36,20 +36,6 @@ const schema = `
     last_login_at TEXT
   );
 
-  CREATE TABLE IF NOT EXISTS access_tokens (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER REFERENCES local_users(id),
-    display_name TEXT NOT NULL,
-    token_hash TEXT NOT NULL UNIQUE,
-    token_hint TEXT NOT NULL,
-    token_active INTEGER NOT NULL DEFAULT 1,
-    support_tier TEXT NOT NULL DEFAULT 'premium',
-    support_active INTEGER NOT NULL DEFAULT 1,
-    support_complimentary INTEGER NOT NULL DEFAULT 1,
-    created_at TEXT NOT NULL,
-    last_used_at TEXT
-  );
-
   CREATE TABLE IF NOT EXISTS plan_presets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     nome TEXT NOT NULL,
@@ -61,6 +47,7 @@ const schema = `
 
   CREATE TABLE IF NOT EXISTS alunos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_user_id INTEGER REFERENCES local_users(id),
     nome TEXT NOT NULL,
     telefone TEXT NOT NULL DEFAULT '',
     observacoes TEXT NOT NULL DEFAULT '',
@@ -177,7 +164,7 @@ async function seedPlanPresets(db) {
   );
 }
 
-async function seedMockData(db) {
+async function seedMockData(db, ownerUserId = null) {
   const marker = await db.query("SELECT value FROM settings WHERE key = 'mock_data_seed_v1'");
   if (marker.values?.length) return;
 
@@ -197,8 +184,8 @@ async function seedMockData(db) {
   try {
     const addStudent = async ({ name, phone, notes, plan, dueOffset, paid, scheduleDay, scheduleTime }) => {
       const studentChange = await db.run(
-        'INSERT INTO alunos (nome, telefone, observacoes, ativo, criado_em) VALUES (?, ?, ?, 1, ?)',
-        [name, phone, notes, createdAt], false
+        'INSERT INTO alunos (owner_user_id, nome, telefone, observacoes, ativo, criado_em) VALUES (?, ?, ?, ?, 1, ?)',
+        [ownerUserId, name, phone, notes, createdAt], false
       );
       const studentId = Number(studentChange.changes.lastId);
       const contractChange = await db.run(
@@ -273,10 +260,33 @@ async function seedMockData(db) {
   }
 }
 
-async function migrateLocalUsers(db) {
-  const columns = await db.query('PRAGMA table_info(access_tokens)');
-  if (!columns.values?.some((column) => column.name === 'user_id')) {
-    await db.execute('ALTER TABLE access_tokens ADD COLUMN user_id INTEGER REFERENCES local_users(id)', true);
+async function migratePinOnlyAuthentication(db) {
+  await db.execute('DROP TABLE IF EXISTS access_tokens', true);
+  const studentColumns = await db.query('PRAGMA table_info(alunos)');
+  if (!studentColumns.values?.some((column) => column.name === 'owner_user_id')) {
+    await db.execute('ALTER TABLE alunos ADD COLUMN owner_user_id INTEGER REFERENCES local_users(id)', true);
+  }
+}
+
+async function clearOperationalTables(db) {
+  await db.beginTransaction();
+  try {
+    await db.run('DELETE FROM pagamentos', [], false);
+    await db.run('DELETE FROM cobrancas', [], false);
+    await db.run('DELETE FROM presencas', [], false);
+    await db.run('DELETE FROM aluno_horarios', [], false);
+    await db.run('DELETE FROM contratos', [], false);
+    await db.run('DELETE FROM alunos', [], false);
+    await db.run("DELETE FROM settings WHERE key = 'mock_data_seed_v1'", [], false);
+    await db.run(
+      "DELETE FROM sqlite_sequence WHERE name IN ('pagamentos', 'cobrancas', 'presencas', 'aluno_horarios', 'contratos', 'alunos')",
+      [],
+      false
+    );
+    await db.commitTransaction();
+  } catch (error) {
+    await db.rollbackTransaction();
+    throw error;
   }
 }
 
@@ -295,7 +305,7 @@ async function openDatabase() {
   if (!open.result) await db.open();
 
   await db.execute(schema, true);
-  await migrateLocalUsers(db);
+  await migratePinOnlyAuthentication(db);
   await db.run(
     'INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (?, ?)',
     [DATABASE_VERSION, nowIso()],
@@ -355,6 +365,23 @@ export async function importDatabase(jsonData) {
   connectionPromise = undefined;
   await sqlite.importFromJson(json);
   await getDatabase();
+  await persistWebDatabase();
+  return true;
+}
+
+export async function resetOperationalData() {
+  const db = await getDatabase();
+  await clearOperationalTables(db);
+  await persistWebDatabase();
+  return true;
+}
+
+export async function loadMockData() {
+  const db = await getDatabase();
+  await clearOperationalTables(db);
+  await seedPlanPresets(db);
+  const owners = await db.query("SELECT id FROM local_users WHERE role = 'manager' AND active = 1 ORDER BY id LIMIT 1");
+  await seedMockData(db, Number(owners.values?.[0]?.id || 0) || null);
   await persistWebDatabase();
   return true;
 }

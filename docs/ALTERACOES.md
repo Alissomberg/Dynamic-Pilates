@@ -4,13 +4,16 @@ Este arquivo deve ser atualizado em toda mudança funcional, técnica ou de dado
 
 ## 2026-09-18 — Zello 1.2.0: operação totalmente local
 
+- removidos completamente os tokens; o acesso agora usa somente PIN individual com hash;
+- o Admin cria SuperUsers e cada SuperUser cria até dois afiliados;
+- SuperUsers e afiliados compartilham os alunos do próprio grupo;
+- o Admin pode consultar e alterar alunos de todos os grupos;
+- adicionados controles exclusivos do Admin para zerar dados operacionais ou carregar dados mock;
 - removida a verificação online de tokens do aplicativo;
-- adicionada a tabela SQLite `access_tokens` e criação de tokens em **Ajustes > Tokens locais**;
 - login simplificado para PIN numérico de 6 dígitos;
 - adicionados perfis locais Admin, SuperUser e Afiliado;
-- o Doutor João é o primeiro SuperUser, com token e cota de dois afiliados;
-- criação de tokens restrita ao admin;
-- afiliados recebem PIN, não recebem token e não podem criar outros usuários;
+- o Doutor João é o primeiro SuperUser, com cota de dois afiliados;
+- afiliados recebem PIN e não podem criar outros usuários;
 - adicionados três alunos fictícios com cenários de cobrança, pagamento e presença;
 - backup e restauração passaram a usar somente arquivos locais;
 - chamadas da API de nuvem e atualização online foram retiradas do cliente;
