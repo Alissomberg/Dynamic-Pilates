@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Browser } from '@capacitor/browser';
 import { Capacitor } from '@capacitor/core';
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
@@ -17,7 +17,7 @@ import {
   Upload
 } from 'lucide-react';
 import { api } from '../services/api.js';
-import { createLocalToken } from '../services/localAuth.js';
+import { createLocalToken, createLocalUser, listLocalUsers } from '../services/localAuth.js';
 import { TouchButton } from '../components/TouchButton.jsx';
 
 const SUPPORT_PHONE = '5581920025567';
@@ -30,10 +30,24 @@ function backupFileName() {
 export function Configuracoes({ auth, onLogout }) {
   const [message, setMessage] = useState('');
   const [processing, setProcessing] = useState('');
-  const [tokenName, setTokenName] = useState('');
   const [createdToken, setCreatedToken] = useState('');
   const [copied, setCopied] = useState(false);
+  const [users, setUsers] = useState([]);
+  const [newUsername, setNewUsername] = useState('');
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState('');
   const account = auth.account;
+  const canManageUsers = account.role === 'admin' || account.role === 'manager';
+  const isAdmin = account.role === 'admin';
+
+  useEffect(() => {
+    if (!canManageUsers) return;
+    listLocalUsers(account).then((items) => {
+      setUsers(items);
+      if (!selectedUserId && items[0]) setSelectedUserId(String(items[0].id));
+    }).catch((error) => setMessage(error.message));
+  }, [account.id, account.role]);
 
   const saveLocalCopy = async () => {
     setProcessing('local');
@@ -94,13 +108,29 @@ export function Configuracoes({ auth, onLogout }) {
     await Browser.open({ url: `https://wa.me/${SUPPORT_PHONE}?text=${text}` });
   };
 
-  const generateToken = async () => {
+  const registerUser = async () => {
     setProcessing('token');
     setMessage('');
     try {
-      const result = await createLocalToken(tokenName);
+      await createLocalUser(account, { username: newUsername, displayName: newUserName, password: newUserPassword });
+      setNewUsername('');
+      setNewUserName('');
+      setNewUserPassword('');
+      setUsers(await listLocalUsers(account));
+      setMessage('Usuário local criado. Entregue a senha com segurança.');
+    } catch (error) {
+      setMessage(`Não foi possível criar o usuário: ${error.message}`);
+    } finally {
+      setProcessing('');
+    }
+  };
+
+  const registerToken = async () => {
+    setProcessing('token');
+    setMessage('');
+    try {
+      const result = await createLocalToken(account, Number(selectedUserId));
       setCreatedToken(result.token);
-      setTokenName('');
       setMessage('Token local criado. Ele será exibido somente agora; copie e guarde com segurança.');
     } catch (error) {
       setMessage(`Não foi possível criar o token: ${error.message}`);
@@ -156,16 +186,31 @@ export function Configuracoes({ auth, onLogout }) {
         </div>
       </section>
 
-      <section className="bg-white rounded-2xl border border-slate-200 shadow-card p-5 sm:p-6">
+      {canManageUsers && <section className="bg-white rounded-2xl border border-slate-200 shadow-card p-5 sm:p-6">
         <div className="flex items-start gap-3 mb-4">
           <div className="w-11 h-11 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center shrink-0"><KeyRound className="w-5 h-5" /></div>
-          <div><h3 className="font-bold text-slate-900">Tokens locais</h3><p className="text-sm text-slate-500 mt-1">Os tokens são criados e validados neste SQLite. Não existe consulta online.</p></div>
+          <div><h3 className="font-bold text-slate-900">Administração local</h3><p className="text-sm text-slate-500 mt-1">Usuários e permissões ficam neste SQLite. Não existe consulta online.</p></div>
         </div>
-        <p className="text-xs text-slate-500 mb-3">Acesso atual: <span className="font-semibold text-slate-800">{account.name}</span> · ID local <span className="font-mono select-text">{account.id}</span></p>
-        <div className="grid sm:grid-cols-[1fr_auto] gap-3">
-          <input value={tokenName} onChange={(event) => setTokenName(event.target.value)} placeholder="Nome do novo usuário" className="min-h-[50px] rounded-xl border border-slate-300 px-4 outline-none focus:border-pilates-600 focus:ring-2 focus:ring-pilates-100" />
-          <TouchButton icon={KeyRound} onClick={generateToken} loading={processing === 'token'} disabled={Boolean(processing)}>Criar token</TouchButton>
+        <p className="text-xs text-slate-500 mb-3">Acesso atual: <span className="font-semibold text-slate-800">{account.name}</span> · perfil <span className="font-semibold">{account.role}</span>{account.role === 'manager' ? ` · limite: ${account.maxUsers} usuários` : ''}</p>
+        <div className="grid sm:grid-cols-3 gap-3">
+          <input value={newUsername} onChange={(event) => setNewUsername(event.target.value)} placeholder="Usuário (ex.: joao)" className="min-h-[50px] rounded-xl border border-slate-300 px-4 outline-none focus:border-pilates-600 focus:ring-2 focus:ring-pilates-100" />
+          <input value={newUserName} onChange={(event) => setNewUserName(event.target.value)} placeholder="Nome completo" className="min-h-[50px] rounded-xl border border-slate-300 px-4 outline-none focus:border-pilates-600 focus:ring-2 focus:ring-pilates-100" />
+          <input type="password" value={newUserPassword} onChange={(event) => setNewUserPassword(event.target.value)} placeholder="Senha (mín. 6)" className="min-h-[50px] rounded-xl border border-slate-300 px-4 outline-none focus:border-pilates-600 focus:ring-2 focus:ring-pilates-100" />
         </div>
+        <TouchButton icon={KeyRound} onClick={registerUser} loading={processing === 'token'} disabled={Boolean(processing)} className="w-full mt-3">Cadastrar usuário</TouchButton>
+        <div className="mt-5 rounded-xl border border-slate-200 overflow-hidden">
+          <div className="bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">Usuários cadastrados</div>
+          {users.map((user) => <div key={user.id} className="px-3 py-2 border-t border-slate-100 text-sm flex flex-wrap gap-x-3 gap-y-1"><span className="font-semibold">{user.display_name}</span><span className="text-slate-500">@{user.username}</span><span className="text-slate-500">{user.role}</span><span className="text-slate-500">tokens: {user.token_count}</span></div>)}
+        </div>
+        {isAdmin && <div className="mt-5 border-t border-slate-200 pt-4">
+          <p className="text-sm font-semibold text-slate-800 mb-2">Registrar token para um usuário</p>
+          <div className="grid sm:grid-cols-[1fr_auto] gap-3">
+            <select value={selectedUserId} onChange={(event) => setSelectedUserId(event.target.value)} className="min-h-[50px] rounded-xl border border-slate-300 px-4 bg-white">
+              {users.map((user) => <option key={user.id} value={user.id}>{user.display_name} (@{user.username})</option>)}
+            </select>
+            <TouchButton icon={KeyRound} onClick={registerToken} loading={processing === 'token'} disabled={Boolean(processing) || !selectedUserId}>Criar token</TouchButton>
+          </div>
+        </div>}
         {createdToken && (
           <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
             <p className="text-xs font-semibold text-amber-900 mb-2">Token criado — copie agora:</p>
@@ -177,7 +222,7 @@ export function Configuracoes({ auth, onLogout }) {
             </div>
           </div>
         )}
-      </section>
+      </section>}
 
       <section className="bg-white rounded-2xl border border-slate-200 shadow-card p-5">
         <div className="flex items-center gap-3 mb-4">

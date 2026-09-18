@@ -6,6 +6,8 @@ Este arquivo deve ser atualizado em toda mudança funcional, técnica ou de dado
 
 - removida a verificação online de tokens do aplicativo;
 - adicionada a tabela SQLite `access_tokens` e criação de tokens em **Ajustes > Tokens locais**;
+- adicionados perfis locais `admin`, `sue9` (cota de dois usuários) e `joao`;
+- criação de tokens restrita ao admin e cadastro de usuários restrito ao admin/sue9;
 - adicionado o token local de demonstração `zello-demo-2026`;
 - adicionados três alunos fictícios com cenários de cobrança, pagamento e presença;
 - backup e restauração passaram a usar somente arquivos locais;

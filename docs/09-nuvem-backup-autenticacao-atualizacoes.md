@@ -13,6 +13,14 @@ O aplicativo atual é totalmente independente. A autenticação, o banco operaci
 - o login consulta apenas o SQLite local;
 - o token de demonstração é `zello-demo-2026` em instalações novas.
 
+### Perfis iniciais
+
+- `admin` / `ZelloAdmin#2026`: vê todos os usuários e registra tokens;
+- `sue9` / `Sue9@2026`: pode cadastrar no máximo dois usuários adicionais;
+- `joao` / `Joao@2026`: usuário local do Doutor João.
+
+Essas credenciais são dados de teste. Troque-as antes de entregar uma instalação real.
+
 ## Backup e restauração
 
 O botão **Salvar cópia local** exporta a base SQLite para um arquivo JSON. O botão **Restaurar arquivo local** valida o arquivo e substitui a base após confirmação. Nenhum backup é enviado automaticamente.

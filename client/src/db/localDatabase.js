@@ -5,7 +5,7 @@ import {
 } from '@capacitor-community/sqlite';
 
 const DATABASE_NAME = 'dynamic_pilates';
-const DATABASE_VERSION = 2;
+const DATABASE_VERSION = 3;
 
 const sqlite = new SQLiteConnection(CapacitorSQLite);
 let connectionPromise;
@@ -23,8 +23,22 @@ const schema = `
     value TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS local_users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    display_name TEXT NOT NULL,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'manager', 'user')),
+    max_users INTEGER NOT NULL DEFAULT 0 CHECK (max_users >= 0),
+    active INTEGER NOT NULL DEFAULT 1,
+    created_by INTEGER REFERENCES local_users(id),
+    created_at TEXT NOT NULL,
+    last_login_at TEXT
+  );
+
   CREATE TABLE IF NOT EXISTS access_tokens (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER REFERENCES local_users(id),
     display_name TEXT NOT NULL,
     token_hash TEXT NOT NULL UNIQUE,
     token_hint TEXT NOT NULL,
@@ -115,6 +129,7 @@ const schema = `
   CREATE INDEX IF NOT EXISTS idx_cobrancas_status_vencimento ON cobrancas(status, data_vencimento);
   CREATE INDEX IF NOT EXISTS idx_pagamentos_data ON pagamentos(data_pagamento);
   CREATE INDEX IF NOT EXISTS idx_presencas_data ON presencas(data, horario);
+  CREATE INDEX IF NOT EXISTS idx_local_users_created_by ON local_users(created_by);
 `;
 
 function nowIso() {
@@ -258,6 +273,13 @@ async function seedMockData(db) {
   }
 }
 
+async function migrateLocalUsers(db) {
+  const columns = await db.query('PRAGMA table_info(access_tokens)');
+  if (!columns.values?.some((column) => column.name === 'user_id')) {
+    await db.execute('ALTER TABLE access_tokens ADD COLUMN user_id INTEGER REFERENCES local_users(id)', true);
+  }
+}
+
 async function openDatabase() {
   if (Capacitor.getPlatform() === 'web') {
     await sqlite.initWebStore();
@@ -273,6 +295,7 @@ async function openDatabase() {
   if (!open.result) await db.open();
 
   await db.execute(schema, true);
+  await migrateLocalUsers(db);
   await db.run(
     'INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (?, ?)',
     [DATABASE_VERSION, nowIso()],

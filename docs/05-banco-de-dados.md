@@ -4,7 +4,7 @@
 
 No Android, `@capacitor-community/sqlite` usa SQLite nativo no dispositivo. No navegador de desenvolvimento, `jeep-sqlite` mantém a mesma base em IndexedDB. Não há banco hospedado nem conexão obrigatória com servidor.
 
-O schema atual tem versão `2` e fica em `client/src/db/localDatabase.js`.
+O schema atual tem versão `3` e fica em `client/src/db/localDatabase.js`.
 
 ## Tabelas
 
@@ -12,6 +12,7 @@ O schema atual tem versão `2` e fica em `client/src/db/localDatabase.js`.
 |---|---|
 | `schema_migrations` | versão aplicada do schema |
 | `settings` | configurações futuras por chave/valor |
+| `local_users` | usuários locais, senha com hash, perfil e cota de cadastro |
 | `access_tokens` | tokens locais, hash, usuário e status de acesso |
 | `plan_presets` | opções frequentes de nome, meses e valor |
 | `alunos` | dados pessoais e status ativo |

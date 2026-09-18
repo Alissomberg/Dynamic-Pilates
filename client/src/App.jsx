@@ -9,7 +9,7 @@ import { Financeiro } from './pages/Financeiro.jsx';
 import { Configuracoes } from './pages/Configuracoes.jsx';
 import { Login } from './pages/Login.jsx';
 import { api } from './services/api.js';
-import { clearAuth, getCachedAuth, initializeLocalAuth, saveAuth, validateLocalToken } from './services/localAuth.js';
+import { clearAuth, getCachedAuth, initializeLocalAuth, saveAuth, validateCachedAccount, validateLocalCredentials, validateLocalToken } from './services/localAuth.js';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -67,8 +67,8 @@ export function App() {
         setState({ loading: false, auth: null, error: '' });
         return;
       }
-      return validateLocalToken(cached.token).then(({ account }) => {
-        const auth = { token: cached.token, account };
+      return validateCachedAccount(cached).then(({ account, loginType }) => {
+        const auth = { ...(cached.token ? { token: cached.token } : {}), account, loginType };
         saveAuth(auth);
         setState({ loading: false, auth, error: '' });
       }).catch(() => {
@@ -80,9 +80,16 @@ export function App() {
     });
   }, []);
 
-  const login = async (token) => {
+  const loginWithToken = async (token) => {
     const { account } = await validateLocalToken(token);
-    const auth = { token, account };
+    const auth = { token, account, loginType: 'token' };
+    saveAuth(auth);
+    setState({ loading: false, auth, error: '' });
+  };
+
+  const loginWithCredentials = async (username, password) => {
+    const { account } = await validateLocalCredentials(username, password);
+    const auth = { account, loginType: 'password' };
     saveAuth(auth);
     setState({ loading: false, auth, error: '' });
   };
@@ -97,7 +104,7 @@ export function App() {
     return <div className="min-h-screen bg-slate-100 flex items-center justify-center text-slate-600 font-semibold">Abrindo o Zello…</div>;
   }
   if (state.error) return <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6 text-center text-rose-700">{state.error}</div>;
-  if (!state.auth) return <Login onLogin={login} />;
+  if (!state.auth) return <Login onTokenLogin={loginWithToken} onCredentialLogin={loginWithCredentials} />;
 
   return (
     <QueryClientProvider client={queryClient}>

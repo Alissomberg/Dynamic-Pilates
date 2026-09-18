@@ -23,6 +23,16 @@ zello-demo-2026
 
 Para criar tokens adicionais, abra **Ajustes > Tokens locais**, informe o nome do usuário e copie o token exibido. O valor completo aparece somente uma vez e fica validado pelo SQLite local.
 
+## Contas locais iniciais
+
+| Usuário | Senha | Permissão |
+|---|---|---|
+| `admin` | `ZelloAdmin#2026` | vê todos os usuários e registra tokens |
+| `sue9` | `Sue9@2026` | cadastra no máximo 2 usuários |
+| `joao` | `Joao@2026` | usuário do Doutor João |
+
+Troque essas senhas na primeira entrega por credenciais mantidas em um gerenciador seguro.
+
 ## Android
 
 ```powershell
