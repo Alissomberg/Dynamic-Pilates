@@ -1,5 +1,12 @@
 apply plugin: 'com.android.application'
 
+def releaseStoreFile = System.getenv('ZELLO_KEYSTORE_PATH')
+def releaseStorePassword = System.getenv('ZELLO_KEYSTORE_PASSWORD')
+def releaseKeyAlias = System.getenv('ZELLO_KEY_ALIAS')
+def releaseKeyPassword = System.getenv('ZELLO_KEY_PASSWORD')
+def releaseSigningConfigured = [releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword]
+        .every { value -> value != null && !value.trim().isEmpty() }
+
 android {
     namespace = "com.dynamicpilates.app"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -20,10 +27,27 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+
+    if (releaseSigningConfigured) {
+        signingConfigs {
+            release {
+                storeFile file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (releaseSigningConfigured) {
+                signingConfig signingConfigs.release
+            } else {
+                logger.lifecycle('Zello release: assinatura não configurada; gerando APK não assinado para validação local.')
+            }
         }
     }
 }

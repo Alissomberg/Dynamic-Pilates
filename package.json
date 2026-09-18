@@ -10,6 +10,7 @@
     "android:sync": "npm --prefix client run android:sync",
     "android:open": "npm --prefix client run android:open",
     "android:run": "npm --prefix client run android:run",
+    "android:release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-android-release.ps1",
     "server": "npm --prefix server start",
     "server:dev": "npm --prefix server run dev",
     "legacy:server": "npm --prefix server start",

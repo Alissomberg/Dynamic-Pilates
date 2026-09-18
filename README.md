@@ -34,6 +34,14 @@ npm run android:sync
 npm run android:open
 ```
 
+Com o keystore de produção criado, o APK assinado também pode ser gerado pelo terminal do Windows:
+
+```powershell
+npm run android:release
+```
+
+Esse comando usa o JDK 17/21, solicita as senhas do keystore sem gravá-las no projeto e calcula o SHA-256 do APK ao final. O arquivo é criado em `client/android/app/build/outputs/apk/release/app-release.apk`.
+
 O `applicationId` anterior foi preservado para que o Zello possa atualizar a instalação existente. A versão atual é `1.1.0` (`versionCode 2`).
 
 ## Operação da nuvem

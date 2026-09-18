@@ -59,6 +59,16 @@ npm run build
 npm run android:sync
 ```
 
+Para fazer o build pelo terminal do Windows, depois de criar o keystore, use:
+
+```powershell
+npm run android:release
+```
+
+O script usa o JDK embutido no Android Studio quando `JAVA_HOME` não está definido,
+desde que ele seja JDK 17 ou 21. Ele solicita as senhas apenas durante o processo e
+não grava essas senhas em arquivos.
+
 ## 5. Keystore de produção
 
 Use sempre o mesmo arquivo:
@@ -106,10 +116,10 @@ Não use validade menor que um ano para o certificado. A validade do certificado
 11. Escolha a pasta de destino.
 12. Clique em **Create** ou **Finish**.
 
-O arquivo normalmente será criado em:
+O arquivo será criado em:
 
 ```text
-C:\Users\fabio\Documents\Dynamic Pylates\client\android\app\release\app-release.apk
+C:\Users\fabio\Documents\Dynamic Pylates\client\android\app\build\outputs\apk\release\app-release.apk
 ```
 
 O caminho mostrado pelo Android Studio após o build é a referência definitiva caso ele tenha sido alterado.
@@ -134,7 +144,7 @@ Se o APK já instalado foi assinado com uma chave diferente, o Android recusará
 Depois de gerar o APK:
 
 ```powershell
-$apk = "C:\Users\fabio\Documents\Dynamic Pylates\client\android\app\release\app-release.apk"
+$apk = "C:\Users\fabio\Documents\Dynamic Pylates\client\android\app\build\outputs\apk\release\app-release.apk"
 Get-Item -LiteralPath $apk | Select-Object FullName,Length,LastWriteTime
 Get-FileHash -Algorithm SHA256 -LiteralPath $apk
 ```
