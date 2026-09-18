@@ -58,6 +58,7 @@ export function Alunos() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos'); // 'todos' | 'em_dia' | 'em_atraso' | 'hoje'
+  const [periodFilter, setPeriodFilter] = useState('manha');
   
   // Modal de Novo Aluno
   const [isNovoAlunoOpen, setIsNovoAlunoOpen] = useState(false);
@@ -93,6 +94,11 @@ export function Alunos() {
     queryKey: ['alunos', searchTerm, statusFilter],
     queryFn: () => api.getAlunos({ search: searchTerm, status: statusFilter })
   });
+
+  const alunosDoPeriodo = alunos.filter((aluno) => aluno.horarios?.some((horario) => {
+    const hour = Number(String(horario.horario || '').split(':')[0]);
+    return periodFilter === 'manha' ? hour < 12 : hour >= 12;
+  }));
 
   const { data: planos = [] } = useQuery({
     queryKey: ['planos'],
@@ -229,7 +235,7 @@ export function Alunos() {
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
             <Users className="w-6 h-6 text-pilates-600" />
-            Alunos do Estúdio ({alunos.length})
+            Alunos do Estúdio ({alunosDoPeriodo.length})
           </h2>
           <p className="text-xs sm:text-sm text-slate-500">
             Planos, pagamentos e programação de aulas
@@ -253,6 +259,22 @@ export function Alunos() {
             + Novo Aluno
           </TouchButton>
         </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-200 p-1.5">
+        {[
+          { id: 'manha', label: 'Manhã' },
+          { id: 'tarde', label: 'Tarde' }
+        ].map((period) => (
+          <button
+            key={period.id}
+            type="button"
+            onClick={() => setPeriodFilter(period.id)}
+            className={`min-h-[46px] rounded-xl text-sm font-bold transition-colors ${periodFilter === period.id ? 'bg-white text-pilates-700 shadow-sm' : 'text-slate-600'}`}
+          >
+            {period.label}
+          </button>
+        ))}
       </div>
 
       {/* Barra de Busca e Filtros */}
@@ -304,9 +326,9 @@ export function Alunos() {
           <div className="w-10 h-10 border-4 border-pilates-600 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
           <p className="text-sm font-medium">Carregando catálogo de alunos...</p>
         </div>
-      ) : alunos.length > 0 ? (
+      ) : alunosDoPeriodo.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {alunos.map(aluno => (
+          {alunosDoPeriodo.map(aluno => (
             <div
               key={aluno.id}
               onClick={() => {
