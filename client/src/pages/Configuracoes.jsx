@@ -1,69 +1,39 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Browser } from '@capacitor/browser';
 import { Capacitor } from '@capacitor/core';
 import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import {
   BadgeCheck,
-  CloudUpload,
-  Database,
+  Check,
+  Copy,
   Download,
   HardDrive,
+  KeyRound,
   LogOut,
   MessageCircle,
-  RefreshCw,
-  RotateCcw,
+  Save,
   Settings,
-  WifiOff
+  Upload
 } from 'lucide-react';
 import { api } from '../services/api.js';
-import { APP_VERSION, APP_VERSION_CODE, cloudApi } from '../services/cloudApi.js';
+import { createLocalToken } from '../services/localAuth.js';
 import { TouchButton } from '../components/TouchButton.jsx';
 
 const SUPPORT_PHONE = '5581920025567';
-
-function formatDate(value) {
-  if (!value) return 'Nenhum backup enviado';
-  return new Date(value).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
-}
+const APP_VERSION = '1.2.0';
 
 function backupFileName() {
   return `zello-backup-${new Date().toISOString().slice(0, 10)}.json`;
 }
 
-export function Configuracoes({ auth, offlineSession, onLogout }) {
+export function Configuracoes({ auth, onLogout }) {
   const [message, setMessage] = useState('');
   const [processing, setProcessing] = useState('');
-  const [restoreCode, setRestoreCode] = useState('');
-  const [latestBackup, setLatestBackup] = useState(null);
-  const [release, setRelease] = useState(null);
-
-  const token = auth.token;
+  const [tokenName, setTokenName] = useState('');
+  const [createdToken, setCreatedToken] = useState('');
+  const [copied, setCopied] = useState(false);
   const account = auth.account;
-  const premium = account.support?.active && account.support?.tier === 'premium';
-
-  useEffect(() => {
-    if (offlineSession) return;
-    Promise.allSettled([
-      cloudApi.getBackupStatus(token).then(({ latest }) => setLatestBackup(latest)),
-      cloudApi.getLatestUpdate(token).then(({ release: latest }) => setRelease(latest))
-    ]);
-  }, [offlineSession, token]);
-
-  const uploadBackup = async () => {
-    setProcessing('upload');
-    setMessage('');
-    try {
-      const backup = await api.exportBackup();
-      const result = await cloudApi.uploadBackup(token, backup);
-      setLatestBackup(result.backup);
-      setMessage('Backup enviado com segurança para o servidor.');
-    } catch (error) {
-      setMessage(`Não foi possível enviar o backup: ${error.message}`);
-    } finally {
-      setProcessing('');
-    }
-  };
 
   const saveLocalCopy = async () => {
     setProcessing('local');
@@ -101,22 +71,15 @@ export function Configuracoes({ auth, offlineSession, onLogout }) {
     }
   };
 
-  const contactSupport = async () => {
-    const text = encodeURIComponent(`Olá! Preciso restaurar meu backup do Zello. Meu ID de suporte é ${account.id}.`);
-    await Browser.open({ url: `https://wa.me/${SUPPORT_PHONE}?text=${text}` });
-  };
-
-  const restoreFromServer = async () => {
-    if (!restoreCode.trim()) {
-      setMessage('Informe o código de restauração enviado pelo suporte.');
-      return;
-    }
-    if (!window.confirm('A restauração substituirá todos os dados atuais deste aparelho. Deseja continuar?')) return;
+  const restoreLocalCopy = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!window.confirm('A restauração substituirá os dados atuais deste aparelho. Deseja continuar?')) return;
     setProcessing('restore');
     setMessage('');
     try {
-      const { backup } = await cloudApi.restoreBackup(token, restoreCode);
-      await api.importBackup(backup);
+      await api.importBackup(JSON.parse(await file.text()));
       setMessage('Dados restaurados. O Zello será recarregado.');
       window.setTimeout(() => window.location.reload(), 1000);
     } catch (error) {
@@ -126,22 +89,42 @@ export function Configuracoes({ auth, offlineSession, onLogout }) {
     }
   };
 
-  const checkUpdate = async () => {
-    setProcessing('update');
+  const contactSupport = async () => {
+    const text = encodeURIComponent(`Olá! Preciso de ajuda com o Zello. Meu ID local é ${account.id}.`);
+    await Browser.open({ url: `https://wa.me/${SUPPORT_PHONE}?text=${text}` });
+  };
+
+  const generateToken = async () => {
+    setProcessing('token');
     setMessage('');
     try {
-      const { release: latest } = await cloudApi.getLatestUpdate(token);
-      setRelease(latest);
-      setMessage(
-        latest && Number(latest.versionCode) > APP_VERSION_CODE
-          ? `A versão ${latest.version} está disponível.`
-          : 'Você já está usando a versão mais recente.'
-      );
+      const result = await createLocalToken(tokenName);
+      setCreatedToken(result.token);
+      setTokenName('');
+      setMessage('Token local criado. Ele será exibido somente agora; copie e guarde com segurança.');
     } catch (error) {
-      setMessage(`Não foi possível verificar atualizações: ${error.message}`);
+      setMessage(`Não foi possível criar o token: ${error.message}`);
     } finally {
       setProcessing('');
     }
+  };
+
+  const copyToken = async () => {
+    if (!createdToken) return;
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(createdToken);
+    } else {
+      const helper = document.createElement('textarea');
+      helper.value = createdToken;
+      helper.style.position = 'fixed';
+      helper.style.opacity = '0';
+      document.body.appendChild(helper);
+      helper.select();
+      document.execCommand('copy');
+      helper.remove();
+    }
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1500);
   };
 
   return (
@@ -150,66 +133,65 @@ export function Configuracoes({ auth, offlineSession, onLogout }) {
         <h2 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
           <Settings className="w-6 h-6 text-pilates-600" /> Ajustes
         </h2>
-        <p className="text-sm text-slate-500">Backup, suporte, atualizações e acesso.</p>
+        <p className="text-sm text-slate-500">Dados, tokens e cópias de segurança locais.</p>
       </div>
-
-      {offlineSession && (
-        <div className="flex gap-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-2xl p-4">
-          <WifiOff className="w-5 h-5 shrink-0 mt-0.5" />
-          <p className="text-sm">Você está usando o Zello offline. Os dados locais continuam funcionando, mas backup e atualização precisam de internet.</p>
-        </div>
-      )}
 
       <section className="bg-white rounded-2xl border border-slate-200 shadow-card p-5 sm:p-6">
         <div className="flex items-start gap-3 mb-5">
-          <div className="w-11 h-11 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0"><CloudUpload className="w-5 h-5" /></div>
+          <div className="w-11 h-11 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0"><HardDrive className="w-5 h-5" /></div>
           <div className="flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="font-bold text-slate-900">Backup seguro</h3>
-              {premium && <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-800 bg-emerald-100 rounded-full px-2 py-1"><BadgeCheck className="w-3.5 h-3.5" /> {account.support.complimentary ? 'Premium gratuito' : 'Premium'}</span>}
+              <h3 className="font-bold text-slate-900">Backup local</h3>
+              <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-800 bg-emerald-100 rounded-full px-2 py-1"><BadgeCheck className="w-3.5 h-3.5" /> Sem servidor</span>
             </div>
-            <p className="text-sm text-slate-500 mt-1">Envie alunos, pagamentos e presenças para o servidor. Por enquanto, o suporte premium não tem cobrança.</p>
+            <p className="text-sm text-slate-500 mt-1">O backup é exportado para um arquivo no dispositivo. Nenhum dado é enviado automaticamente.</p>
           </div>
         </div>
-        <div className="rounded-xl bg-slate-50 border border-slate-200 p-3 mb-4 text-sm text-slate-600">Último envio: <strong className="text-slate-800">{formatDate(latestBackup?.createdAt)}</strong></div>
         <div className="grid sm:grid-cols-2 gap-3">
-          <TouchButton icon={CloudUpload} onClick={uploadBackup} loading={processing === 'upload'} disabled={!premium || offlineSession || Boolean(processing)}>Enviar backup agora</TouchButton>
           <TouchButton variant="outline" icon={Download} onClick={saveLocalCopy} loading={processing === 'local'} disabled={Boolean(processing)}>Salvar cópia local</TouchButton>
+          <label className="inline-flex items-center justify-center gap-2 min-h-[50px] rounded-xl border border-slate-300 px-4 text-sm font-semibold text-slate-700 cursor-pointer hover:bg-slate-50">
+            <Upload className="w-5 h-5" /> Restaurar arquivo local
+            <input type="file" accept="application/json,.json" onChange={restoreLocalCopy} disabled={Boolean(processing)} className="sr-only" />
+          </label>
         </div>
       </section>
 
       <section className="bg-white rounded-2xl border border-slate-200 shadow-card p-5 sm:p-6">
         <div className="flex items-start gap-3 mb-4">
-          <div className="w-11 h-11 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center shrink-0"><RotateCcw className="w-5 h-5" /></div>
-          <div><h3 className="font-bold text-slate-900">Restaurar com o suporte</h3><p className="text-sm text-slate-500 mt-1">Fale conosco no WhatsApp. A equipe confirmará sua conta e enviará um código temporário.</p></div>
+          <div className="w-11 h-11 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center shrink-0"><KeyRound className="w-5 h-5" /></div>
+          <div><h3 className="font-bold text-slate-900">Tokens locais</h3><p className="text-sm text-slate-500 mt-1">Os tokens são criados e validados neste SQLite. Não existe consulta online.</p></div>
         </div>
-        <p className="text-xs text-slate-500 mb-3">ID de suporte: <span className="font-mono select-text">{account.id}</span></p>
-        <TouchButton variant="success" icon={MessageCircle} onClick={contactSupport} className="w-full mb-4">Falar no WhatsApp: (81) 92002-5567</TouchButton>
+        <p className="text-xs text-slate-500 mb-3">Acesso atual: <span className="font-semibold text-slate-800">{account.name}</span> · ID local <span className="font-mono select-text">{account.id}</span></p>
         <div className="grid sm:grid-cols-[1fr_auto] gap-3">
-          <input value={restoreCode} onChange={(event) => setRestoreCode(event.target.value.toUpperCase())} placeholder="Código de restauração" autoCapitalize="characters" className="min-h-[50px] rounded-xl border border-slate-300 px-4 font-mono outline-none focus:border-pilates-600 focus:ring-2 focus:ring-pilates-100" />
-          <TouchButton variant="outline" icon={Database} onClick={restoreFromServer} loading={processing === 'restore'} disabled={offlineSession || Boolean(processing)}>Restaurar</TouchButton>
+          <input value={tokenName} onChange={(event) => setTokenName(event.target.value)} placeholder="Nome do novo usuário" className="min-h-[50px] rounded-xl border border-slate-300 px-4 outline-none focus:border-pilates-600 focus:ring-2 focus:ring-pilates-100" />
+          <TouchButton icon={KeyRound} onClick={generateToken} loading={processing === 'token'} disabled={Boolean(processing)}>Criar token</TouchButton>
         </div>
+        {createdToken && (
+          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <p className="text-xs font-semibold text-amber-900 mb-2">Token criado — copie agora:</p>
+            <div className="flex gap-2 items-center">
+              <code className="flex-1 min-w-0 break-all rounded-lg bg-white border border-amber-200 px-3 py-2 text-sm text-slate-800">{createdToken}</code>
+              <button type="button" onClick={copyToken} className="shrink-0 rounded-lg border border-amber-300 p-2 text-amber-800 hover:bg-amber-100" aria-label="Copiar token">
+                {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
+              </button>
+            </div>
+          </div>
+        )}
       </section>
 
       <section className="bg-white rounded-2xl border border-slate-200 shadow-card p-5">
         <div className="flex items-center gap-3 mb-4">
-          <RefreshCw className="w-5 h-5 text-pilates-600 shrink-0" />
-          <div className="flex-1"><h3 className="font-bold text-slate-900">Atualizações do aplicativo</h3><p className="text-sm text-slate-500">Versão instalada: {APP_VERSION}</p></div>
+          <MessageCircle className="w-5 h-5 text-pilates-600 shrink-0" />
+          <div className="flex-1"><h3 className="font-bold text-slate-900">Suporte</h3><p className="text-sm text-slate-500">O WhatsApp é opcional e só abre quando você tocar no botão.</p></div>
         </div>
-        {release && Number(release.versionCode) > APP_VERSION_CODE && (
-          <div className="rounded-xl border border-pilates-200 bg-pilates-50 p-4 mb-3">
-            <p className="font-bold text-pilates-900">Zello {release.version} disponível</p><p className="text-sm text-pilates-800 mt-1">{release.notes}</p>
-            <TouchButton icon={Download} onClick={() => Browser.open({ url: release.downloadUrl })} className="w-full mt-3">Baixar novo APK</TouchButton>
-          </div>
-        )}
-        <TouchButton variant="outline" icon={RefreshCw} onClick={checkUpdate} loading={processing === 'update'} disabled={offlineSession || Boolean(processing)} className="w-full">Verificar atualizações</TouchButton>
+        <TouchButton variant="success" icon={MessageCircle} onClick={contactSupport} className="w-full">Falar no WhatsApp: (81) 92002-5567</TouchButton>
       </section>
 
       {message && <p className="text-sm font-medium text-slate-700 bg-white border border-slate-200 rounded-xl p-3">{message}</p>}
 
       <section className="bg-white rounded-2xl border border-slate-200 shadow-card p-5 flex flex-col sm:flex-row sm:items-center gap-4">
-        <HardDrive className="w-5 h-5 text-pilates-600 shrink-0" />
-        <div className="flex-1"><h3 className="font-bold text-slate-900">{account.name}</h3><p className="text-sm text-slate-500">Seus dados diários continuam salvos neste tablet.</p></div>
+        <Save className="w-5 h-5 text-pilates-600 shrink-0" />
+        <div className="flex-1"><h3 className="font-bold text-slate-900">{account.name}</h3><p className="text-sm text-slate-500">Zello {APP_VERSION} · dados salvos somente neste dispositivo.</p></div>
         <TouchButton variant="ghost" size="sm" icon={LogOut} onClick={onLogout}>Sair</TouchButton>
       </section>
     </div>

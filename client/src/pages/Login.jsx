@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { KeyRound, WifiOff } from 'lucide-react';
+import { KeyRound } from 'lucide-react';
 import { TouchButton } from '../components/TouchButton.jsx';
+import { DEMO_TOKEN } from '../services/localAuth.js';
 
-export function Login({ onLogin, apiConfigured }) {
+export function Login({ onLogin }) {
   const [token, setToken] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -51,12 +52,16 @@ export function Login({ onLogin, apiConfigured }) {
             </div>
           </label>
           {error && <p className="text-sm font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-xl p-3">{error}</p>}
-          {!apiConfigured && (
-            <p className="flex gap-2 text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-3">
-              <WifiOff className="w-5 h-5 shrink-0" />
-              Este APK ainda não possui o endereço do servidor. Solicite uma versão configurada ao suporte.
-            </p>
-          )}
+          <p className="text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl p-3">
+            O acesso é validado localmente neste dispositivo. Não é necessária conexão com a internet.
+          </p>
+          <button
+            type="button"
+            onClick={() => setToken(DEMO_TOKEN)}
+            className="w-full text-xs font-semibold text-pilates-700 hover:text-pilates-900"
+          >
+            Preencher token de demonstração local
+          </button>
           <TouchButton type="submit" size="lg" loading={loading} className="w-full">
             Entrar
           </TouchButton>

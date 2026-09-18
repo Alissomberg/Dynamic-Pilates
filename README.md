@@ -1,6 +1,6 @@
 # Zello
 
-Aplicativo Android offline-first para gestão de estúdios. Alunos, horários, presenças, planos e pagamentos continuam no SQLite do tablet; a camada Zello Cloud cuida de ativação por token, backup premium assistido e distribuição de novas versões do APK.
+Aplicativo Android offline-first para gestão de estúdios. Alunos, horários, presenças, planos, pagamentos e tokens ficam no SQLite do próprio dispositivo. O aplicativo não depende de servidor para abrir, autenticar ou operar.
 
 ## Desenvolvimento
 
@@ -8,26 +8,22 @@ Requisitos: Node.js `24.15.0` e npm.
 
 ```powershell
 npm install --prefix client
-npm install --prefix server
-npm run server:dev
-npm run dev
+npm run client
 ```
 
-Acesse `http://localhost:3000`. No navegador, o Vite encaminha `/api/v1` para o servidor local.
+Acesse `http://localhost:3000`.
 
-## Primeiro token
+## Token de teste
 
-Com o servidor configurado, a equipe técnica cria um token e o entrega ao cliente:
+Em uma instalação nova, use este token local na tela de login:
 
 ```powershell
-npm run token:create -- --name "Nome do cliente"
+zello-demo-2026
 ```
 
-O token aparece uma única vez. Por padrão, as novas contas recebem suporte premium gratuito.
+Para criar tokens adicionais, abra **Ajustes > Tokens locais**, informe o nome do usuário e copie o token exibido. O valor completo aparece somente uma vez e fica validado pelo SQLite local.
 
 ## Android
-
-Antes de gerar o APK, copie `client/.env.example` para `client/.env.production` e defina a URL HTTPS pública da API. Depois:
 
 ```powershell
 npm run android:sync
@@ -42,25 +38,9 @@ npm run android:release
 
 Esse comando usa o JDK 17/21, solicita as senhas do keystore sem gravá-las no projeto e calcula o SHA-256 do APK ao final. O arquivo é criado em `client/android/app/build/outputs/apk/release/app-release.apk`.
 
-O `applicationId` anterior foi preservado para que o Zello possa atualizar a instalação existente. A versão atual é `1.1.0` (`versionCode 2`).
+O `applicationId` anterior foi preservado para que o Zello possa atualizar a instalação existente. A versão atual é `1.2.0` (`versionCode 3`).
 
-## Operação da nuvem
-
-Copie `server/.env.example` para `server/.env` e configure o servidor. Banco, pasta de backups e pasta de releases precisam estar em armazenamento persistente. Nunca altere `BACKUP_ENCRYPTION_KEY` sem migrar os arquivos existentes, pois ela é necessária para restaurá-los.
-
-Para entregar um código temporário de restauração após validar o cliente pelo WhatsApp:
-
-```powershell
-npm run restore-code:create -- --account ID_DA_CONTA
-```
-
-Para disponibilizar um APK novo pela API de atualização:
-
-```powershell
-npm run release:publish -- --apk caminho\zello.apk --version 1.2.0 --version-code 3 --notes "Correções e melhorias"
-```
-
-Leia [docs/README.md](docs/README.md) e [docs/09-nuvem-backup-autenticacao-atualizacoes.md](docs/09-nuvem-backup-autenticacao-atualizacoes.md) para detalhes.
+O servidor legado permanece no repositório para uma futura retomada, mas não é iniciado nem consultado pelo aplicativo atual.
 
 Para iniciar o sistema no computador, siga [COMO-RODAR-LOCAL.md](COMO-RODAR-LOCAL.md).
 

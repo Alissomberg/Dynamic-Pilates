@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
-import { Browser } from '@capacitor/browser';
 import { Header } from './components/Header.jsx';
 import { BottomNav } from './components/BottomNav.jsx';
 import { Inicio } from './pages/Inicio.jsx';
@@ -9,9 +8,8 @@ import { Alunos } from './pages/Alunos.jsx';
 import { Financeiro } from './pages/Financeiro.jsx';
 import { Configuracoes } from './pages/Configuracoes.jsx';
 import { Login } from './pages/Login.jsx';
-import { UpdateBanner } from './components/UpdateBanner.jsx';
 import { api } from './services/api.js';
-import { APP_VERSION_CODE, clearAuth, cloudApi, getCachedAuth, saveAuth } from './services/cloudApi.js';
+import { clearAuth, getCachedAuth, initializeLocalAuth, saveAuth, validateLocalToken } from './services/localAuth.js';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -22,21 +20,8 @@ const queryClient = new QueryClient({
   }
 });
 
-function MainApp({ auth, offlineSession, onLogout }) {
+function MainApp({ auth, onLogout }) {
   const [activeTab, setActiveTab] = useState('inicio');
-  const [update, setUpdate] = useState(null);
-
-  useEffect(() => {
-    if (offlineSession) return;
-    cloudApi.getLatestUpdate(auth.token).then(({ release }) => {
-      if (release && Number(release.versionCode) > APP_VERSION_CODE) setUpdate(release);
-    }).catch(() => {});
-  }, [auth.token, offlineSession]);
-
-  const downloadUpdate = async () => {
-    if (!update?.downloadUrl) return;
-    await Browser.open({ url: update.downloadUrl });
-  };
 
   // Contagem de alertas para badge
   const { data: dashboardData } = useQuery({
@@ -50,7 +35,6 @@ function MainApp({ auth, offlineSession, onLogout }) {
     <div className="min-h-screen bg-slate-100 flex flex-col font-sans">
       {/* Header Principal com Logo */}
       <Header />
-      <UpdateBanner release={update} onDownload={downloadUpdate} onDismiss={() => setUpdate(null)} />
 
       {/* Conteúdo Principal Touch-First */}
       <main className="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 pb-28">
@@ -59,7 +43,7 @@ function MainApp({ auth, offlineSession, onLogout }) {
         {activeTab === 'alunos' && <Alunos />}
         {activeTab === 'financeiro' && <Financeiro />}
         {activeTab === 'ajustes' && (
-          <Configuracoes auth={auth} offlineSession={offlineSession} onLogout={onLogout} />
+          <Configuracoes auth={auth} onLogout={onLogout} />
         )}
       </main>
 
@@ -74,49 +58,50 @@ function MainApp({ auth, offlineSession, onLogout }) {
 }
 
 export function App() {
-  const [state, setState] = useState({ loading: true, auth: null, offline: false });
+  const [state, setState] = useState({ loading: true, auth: null, error: '' });
 
   useEffect(() => {
-    const cached = getCachedAuth();
-    if (!cached) {
-      setState({ loading: false, auth: null, offline: false });
-      return;
-    }
-    cloudApi.validateToken(cached.token).then(({ account }) => {
-      const auth = { token: cached.token, account };
-      saveAuth(auth);
-      setState({ loading: false, auth, offline: false });
-    }).catch((error) => {
-      if (error.status === 401) {
-        clearAuth();
-        setState({ loading: false, auth: null, offline: false });
-      } else {
-        setState({ loading: false, auth: cached, offline: true });
+    initializeLocalAuth().then(() => {
+      const cached = getCachedAuth();
+      if (!cached) {
+        setState({ loading: false, auth: null, error: '' });
+        return;
       }
+      return validateLocalToken(cached.token).then(({ account }) => {
+        const auth = { token: cached.token, account };
+        saveAuth(auth);
+        setState({ loading: false, auth, error: '' });
+      }).catch(() => {
+        clearAuth();
+        setState({ loading: false, auth: null, error: '' });
+      });
+    }).catch((error) => {
+      setState({ loading: false, auth: null, error: error.message || 'Não foi possível abrir o banco local.' });
     });
   }, []);
 
   const login = async (token) => {
-    const { account } = await cloudApi.validateToken(token);
+    const { account } = await validateLocalToken(token);
     const auth = { token, account };
     saveAuth(auth);
-    setState({ loading: false, auth, offline: false });
+    setState({ loading: false, auth, error: '' });
   };
 
   const logout = () => {
     clearAuth();
     queryClient.clear();
-    setState({ loading: false, auth: null, offline: false });
+    setState({ loading: false, auth: null, error: '' });
   };
 
   if (state.loading) {
     return <div className="min-h-screen bg-slate-100 flex items-center justify-center text-slate-600 font-semibold">Abrindo o Zello…</div>;
   }
-  if (!state.auth) return <Login onLogin={login} apiConfigured={cloudApi.isConfigured} />;
+  if (state.error) return <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6 text-center text-rose-700">{state.error}</div>;
+  if (!state.auth) return <Login onLogin={login} />;
 
   return (
     <QueryClientProvider client={queryClient}>
-      <MainApp auth={state.auth} offlineSession={state.offline} onLogout={logout} />
+      <MainApp auth={state.auth} onLogout={logout} />
     </QueryClientProvider>
   );
 }

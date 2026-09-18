@@ -4,7 +4,7 @@
 
 No Android, `@capacitor-community/sqlite` usa SQLite nativo no dispositivo. No navegador de desenvolvimento, `jeep-sqlite` mantém a mesma base em IndexedDB. Não há banco hospedado nem conexão obrigatória com servidor.
 
-O schema atual tem versão `1` e fica em `client/src/db/localDatabase.js`.
+O schema atual tem versão `2` e fica em `client/src/db/localDatabase.js`.
 
 ## Tabelas
 
@@ -12,6 +12,7 @@ O schema atual tem versão `1` e fica em `client/src/db/localDatabase.js`.
 |---|---|
 | `schema_migrations` | versão aplicada do schema |
 | `settings` | configurações futuras por chave/valor |
+| `access_tokens` | tokens locais, hash, usuário e status de acesso |
 | `plan_presets` | opções frequentes de nome, meses e valor |
 | `alunos` | dados pessoais e status ativo |
 | `contratos` | plano, recorrência, valor e vencimento |
@@ -43,14 +44,15 @@ Criação de aluno, substituição de horários e recebimento financeiro usam tr
 
 ## Dados iniciais
 
-Somente duas opções de plano são criadas em banco vazio:
+Em um banco vazio são criados:
 
 - Mensal: 1 mês, R$ 185;
 - Trimestral: 3 meses, R$ 555.
+- três alunos fictícios para demonstração, com contratos, cobranças, pagamentos e presenças;
+- um acesso local de demonstração com o token `zello-demo-2026`.
 
-Não são criados alunos fictícios. O seed antigo permanece exclusivamente no servidor legado.
+Os dados de demonstração só são incluídos quando ainda não há alunos no banco. O servidor legado não participa desse seed.
 
 ## Migrações futuras
 
 Toda mudança de schema deve aumentar `DATABASE_VERSION`, aplicar migração incremental e registrar a versão em `schema_migrations`. Nunca se deve exigir que o cliente apague o aplicativo para atualizar.
-

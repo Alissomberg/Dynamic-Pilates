@@ -5,7 +5,7 @@ import {
 } from '@capacitor-community/sqlite';
 
 const DATABASE_NAME = 'dynamic_pilates';
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 
 const sqlite = new SQLiteConnection(CapacitorSQLite);
 let connectionPromise;
@@ -21,6 +21,19 @@ const schema = `
   CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY NOT NULL,
     value TEXT NOT NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS access_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    display_name TEXT NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    token_hint TEXT NOT NULL,
+    token_active INTEGER NOT NULL DEFAULT 1,
+    support_tier TEXT NOT NULL DEFAULT 'premium',
+    support_active INTEGER NOT NULL DEFAULT 1,
+    support_complimentary INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL,
+    last_used_at TEXT
   );
 
   CREATE TABLE IF NOT EXISTS plan_presets (
@@ -108,6 +121,22 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function localDateString(offsetDays = 0) {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function weekdayForOffset(offsetDays = 0) {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  const day = date.getDay();
+  return day === 0 ? 1 : day;
+}
+
 async function persistWebDatabase() {
   if (Capacitor.getPlatform() === 'web') {
     await sqlite.saveToStore(DATABASE_NAME);
@@ -133,6 +162,102 @@ async function seedPlanPresets(db) {
   );
 }
 
+async function seedMockData(db) {
+  const marker = await db.query("SELECT value FROM settings WHERE key = 'mock_data_seed_v1'");
+  if (marker.values?.length) return;
+
+  const students = await db.query('SELECT COUNT(*) AS total FROM alunos');
+  if (Number(students.values?.[0]?.total || 0) > 0) {
+    await db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('mock_data_seed_v1', 'skipped-existing-data')", [], false);
+    return;
+  }
+
+  const plans = await db.query('SELECT id, nome, duracao_meses, valor_centavos FROM plan_presets WHERE ativo = 1 ORDER BY duracao_meses');
+  const monthly = plans.values?.find((plan) => Number(plan.duracao_meses) === 1) || plans.values?.[0];
+  const quarterly = plans.values?.find((plan) => Number(plan.duracao_meses) === 3) || monthly;
+  if (!monthly || !quarterly) return;
+
+  const createdAt = nowIso();
+  await db.beginTransaction();
+  try {
+    const addStudent = async ({ name, phone, notes, plan, dueOffset, paid, scheduleDay, scheduleTime }) => {
+      const studentChange = await db.run(
+        'INSERT INTO alunos (nome, telefone, observacoes, ativo, criado_em) VALUES (?, ?, ?, 1, ?)',
+        [name, phone, notes, createdAt], false
+      );
+      const studentId = Number(studentChange.changes.lastId);
+      const contractChange = await db.run(
+        `INSERT INTO contratos (aluno_id, preset_id, nome_plano, tipo_plano,
+          duracao_plano_meses, periodicidade_cobranca_meses, valor_centavos,
+          dia_vencimento, data_inicio, ativo, criado_em)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
+        [studentId, plan.id, plan.nome, Number(plan.duracao_meses) === 3 ? 'trimestral' : 'mensal',
+          plan.duracao_meses, plan.duracao_meses, plan.valor_centavos, 10,
+          localDateString(-30), createdAt], false
+      );
+      const contractId = Number(contractChange.changes.lastId);
+      await db.run(
+        'INSERT INTO aluno_horarios (aluno_id, dia_semana, horario) VALUES (?, ?, ?)',
+        [studentId, scheduleDay, scheduleTime], false
+      );
+
+      const dueDate = localDateString(dueOffset);
+      const chargeChange = await db.run(
+        `INSERT INTO cobrancas (aluno_id, contrato_id, competencia, data_vencimento,
+          valor_centavos, status, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [studentId, contractId, dueDate.slice(0, 7), dueDate, plan.valor_centavos, paid ? 'pago' : 'pendente', createdAt], false
+      );
+      const chargeId = Number(chargeChange.changes.lastId);
+
+      if (paid) {
+        await db.run(
+          `INSERT INTO pagamentos (cobranca_id, aluno_id, data_pagamento, valor_centavos,
+            forma_pagamento, observacao, criado_em) VALUES (?, ?, ?, ?, 'pix', 'Pagamento de demonstração', ?)`,
+          [chargeId, studentId, localDateString(-1), plan.valor_centavos, createdAt], false
+        );
+        const nextDueDate = localDateString(30);
+        await db.run(
+          `INSERT INTO cobrancas (aluno_id, contrato_id, competencia, data_vencimento,
+            valor_centavos, status, criado_em) VALUES (?, ?, ?, ?, ?, 'pendente', ?)`,
+          [studentId, contractId, nextDueDate.slice(0, 7), nextDueDate, plan.valor_centavos, createdAt], false
+        );
+      }
+
+      await db.run(
+        `INSERT INTO presencas (aluno_id, data, horario, status, criado_em)
+         VALUES (?, ?, ?, 'presente', ?)`,
+        [studentId, localDateString(-7), scheduleTime, createdAt], false
+      );
+      await db.run(
+        `INSERT INTO presencas (aluno_id, data, horario, status, criado_em)
+         VALUES (?, ?, ?, 'falta', ?)`,
+        [studentId, localDateString(-14), scheduleTime, createdAt], false
+      );
+    };
+
+    await addStudent({
+      name: 'Ana Beatriz Oliveira', phone: '(85) 99999-1001',
+      notes: 'Aluna de demonstração — dados fictícios.', plan: monthly,
+      dueOffset: 2, paid: false, scheduleDay: weekdayForOffset(0), scheduleTime: '08:00'
+    });
+    await addStudent({
+      name: 'Carlos Eduardo Lima', phone: '(85) 99999-1002',
+      notes: 'Cenário de cobrança paga.', plan: quarterly,
+      dueOffset: -5, paid: true, scheduleDay: weekdayForOffset(1), scheduleTime: '14:00'
+    });
+    await addStudent({
+      name: 'Mariana Souza Costa', phone: '(85) 99999-1003',
+      notes: 'Cenário de cobrança em atraso.', plan: monthly,
+      dueOffset: -10, paid: false, scheduleDay: weekdayForOffset(2), scheduleTime: '18:00'
+    });
+    await db.run("INSERT INTO settings (key, value) VALUES ('mock_data_seed_v1', 'installed')", [], false);
+    await db.commitTransaction();
+  } catch (error) {
+    await db.rollbackTransaction();
+    throw error;
+  }
+}
+
 async function openDatabase() {
   if (Capacitor.getPlatform() === 'web') {
     await sqlite.initWebStore();
@@ -154,6 +279,7 @@ async function openDatabase() {
     true
   );
   await seedPlanPresets(db);
+  await seedMockData(db);
   await persistWebDatabase();
   return db;
 }

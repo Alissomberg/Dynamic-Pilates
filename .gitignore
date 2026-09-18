@@ -11,6 +11,7 @@ dist/
 client/android/.gradle/
 client/android/build/
 client/android/app/build/
+client/android/app/release/
 client/android/local.properties
 *.apk
 *.aab

@@ -2,6 +2,16 @@
 
 Este arquivo deve ser atualizado em toda mudança funcional, técnica ou de dados do Zello.
 
+## 2026-09-18 — Zello 1.2.0: operação totalmente local
+
+- removida a verificação online de tokens do aplicativo;
+- adicionada a tabela SQLite `access_tokens` e criação de tokens em **Ajustes > Tokens locais**;
+- adicionado o token local de demonstração `zello-demo-2026`;
+- adicionados três alunos fictícios com cenários de cobrança, pagamento e presença;
+- backup e restauração passaram a usar somente arquivos locais;
+- chamadas da API de nuvem e atualização online foram retiradas do cliente;
+- o servidor permanece apenas como código legado para uma futura fase.
+
 ## 2026-09-18 — Zello 1.1.0
 
 - nova identidade Zello aplicada à interface, ícone e tela de abertura;
