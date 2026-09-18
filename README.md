@@ -55,3 +55,5 @@ npm run release:publish -- --apk caminho\zello.apk --version 1.2.0 --version-cod
 Leia [docs/README.md](docs/README.md) e [docs/09-nuvem-backup-autenticacao-atualizacoes.md](docs/09-nuvem-backup-autenticacao-atualizacoes.md) para detalhes.
 
 Para iniciar o sistema no computador, siga [COMO-RODAR-LOCAL.md](COMO-RODAR-LOCAL.md).
+
+Para gerar e compartilhar um APK assinado, siga [INSTRUCOES-APK-COMPARTILHAVEL.md](INSTRUCOES-APK-COMPARTILHAVEL.md).
