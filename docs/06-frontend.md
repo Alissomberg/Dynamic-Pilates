@@ -46,5 +46,4 @@ O layout foi validado em viewport de tablet e mobile. Controles são HTML nativo
 
 ## Android
 
-`client/capacitor.config.json` define o pacote `com.dynamicpilates.app` e o nome Dynamic Pilates. O projeto gerado suporta Android a partir do SDK 24 e compila contra SDK 36.
-
+`client/capacitor.config.json` preserva o pacote `com.dynamicpilates.app` para manter a compatibilidade de atualização e usa o nome Zello. O projeto gerado suporta Android a partir do SDK 24 e compila contra SDK 36.

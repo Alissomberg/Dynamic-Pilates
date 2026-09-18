@@ -1,6 +1,6 @@
 {
   "appId": "com.dynamicpilates.app",
-  "appName": "Dynamic Pilates",
+  "appName": "Zello",
   "webDir": "dist",
   "server": {
     "androidScheme": "https"

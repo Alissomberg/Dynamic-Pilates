@@ -433,11 +433,13 @@ async function createPlanPreset({ nome, duracao_meses, valor }) {
 
 async function exportBackup() {
   const data = await exportDatabase();
-  return { app: 'Dynamic Pilates', exportedAt: new Date().toISOString(), database: data.export };
+  return { app: 'Zello', backupFormat: 2, exportedAt: new Date().toISOString(), database: data.export };
 }
 
 async function importBackup(backup) {
-  if (!backup || backup.app !== 'Dynamic Pilates' || !backup.database) throw new Error('Este arquivo não é um backup do Dynamic Pilates.');
+  if (!backup || !['Zello', 'Dynamic Pilates'].includes(backup.app) || !backup.database) {
+    throw new Error('Este arquivo não é um backup válido do Zello.');
+  }
   return importDatabase(backup.database);
 }
 

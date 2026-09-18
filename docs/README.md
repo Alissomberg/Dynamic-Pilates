@@ -1,4 +1,4 @@
-# Documentação do Dynamic Pilates
+# Documentação do Zello
 
 Documentação do aplicativo Android offline-first, atualizada em 10 de setembro de 2026.
 
@@ -16,7 +16,8 @@ O aplicativo React/JavaScript já opera sem servidor, usando SQLite local, e pos
 6. [Frontend e experiência de uso](./06-frontend.md)
 7. [Diagnóstico histórico e roadmap](./07-diagnostico-e-roadmap.md)
 8. [Decisão de arquitetura: APK offline-first](./08-decisao-apk-offline.md)
-9. [Registro permanente de alterações](./ALTERACOES.md)
+9. [Nuvem: autenticação, backup e atualizações](./09-nuvem-backup-autenticacao-atualizacoes.md)
+10. [Registro permanente de alterações](./ALTERACOES.md)
 
 ## Componentes vigentes
 
@@ -28,6 +29,8 @@ O aplicativo React/JavaScript já opera sem servidor, usando SQLite local, e pos
 | Schema e conexão SQLite | `client/src/db/localDatabase.js` |
 | Configuração Capacitor | `client/capacitor.config.json` |
 | Projeto Android | `client/android/` |
+| API de nuvem | `server/src/routes/cloudRoutes.js` |
+| Backup criptografado | `server/src/services/cloudService.js` |
 | Histórico obrigatório | `docs/ALTERACOES.md` |
 
 ## Convenções vigentes
@@ -39,4 +42,4 @@ O aplicativo React/JavaScript já opera sem servidor, usando SQLite local, e pos
 - um horário independente para cada dia da semana;
 - manhã antes de 12h e tarde a partir de 12h.
 
-Os documentos 01, 04 e 07 preservam a arquitetura anterior. Em caso de divergência, este índice, os documentos 02 e 08 e `ALTERACOES.md` descrevem o estado vigente.
+Os documentos 01, 04 e 07 preservam a arquitetura anterior. Em caso de divergência, este índice, os documentos 02, 08 e 09 e `ALTERACOES.md` descrevem o estado vigente.

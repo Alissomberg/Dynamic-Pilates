@@ -19,16 +19,16 @@ export function Header() {
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-pilates-600 to-pilates-400 p-1 shadow-sm flex items-center justify-center shrink-0">
             <img 
               src="/logo.png" 
-              alt="Dynamic Pilates Logo" 
+              alt="Logo Zello"
               className="w-full h-full object-contain rounded-xl bg-white p-0.5" 
             />
           </div>
           <div>
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 flex items-center gap-2">
-              Dynamic Pilates
+              Zello
             </h1>
             <p className="text-xs text-slate-500 font-medium hidden sm:block">
-              Estúdio de Pilates & Fisioterapia • Dr. João
+              Gestão que cuida
             </p>
           </div>
         </div>

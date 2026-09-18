@@ -14,6 +14,10 @@ client/android/app/build/
 client/android/local.properties
 *.apk
 *.aab
+*.jks
+*.keystore
+keystore.properties
+private/
 
 # Bancos e arquivos auxiliares
 server/data/*.db
@@ -31,4 +35,3 @@ server/data/*.db-wal
 *.log
 .DS_Store
 Thumbs.db
-

@@ -17,6 +17,9 @@ db.exec('PRAGMA journal_mode = WAL;');
 export function initDatabase(forceDrop = false) {
   if (forceDrop) {
     db.exec(`
+      DROP TABLE IF EXISTS cloud_restore_codes;
+      DROP TABLE IF EXISTS cloud_backups;
+      DROP TABLE IF EXISTS cloud_accounts;
       DROP TABLE IF EXISTS presencas;
       DROP TABLE IF EXISTS pagamentos;
       DROP TABLE IF EXISTS cobrancas;
@@ -95,7 +98,51 @@ export function initDatabase(forceDrop = false) {
       criado_em TEXT DEFAULT (datetime('now', 'localtime')),
       UNIQUE(aluno_id, data, horario)
     );
+
+    CREATE TABLE IF NOT EXISTS cloud_accounts (
+      id TEXT PRIMARY KEY,
+      display_name TEXT NOT NULL,
+      token_hash TEXT NOT NULL UNIQUE,
+      token_hint TEXT NOT NULL,
+      token_active INTEGER NOT NULL DEFAULT 1,
+      support_tier TEXT NOT NULL DEFAULT 'premium',
+      support_active INTEGER NOT NULL DEFAULT 1,
+      support_complimentary INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL,
+      last_login_at TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS cloud_backups (
+      id TEXT PRIMARY KEY,
+      account_id TEXT NOT NULL REFERENCES cloud_accounts(id) ON DELETE CASCADE,
+      relative_path TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL,
+      app_version TEXT NOT NULL,
+      device_id TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      sha256 TEXT NOT NULL
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_cloud_backups_account_date
+      ON cloud_backups(account_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS cloud_restore_codes (
+      id TEXT PRIMARY KEY,
+      account_id TEXT NOT NULL REFERENCES cloud_accounts(id) ON DELETE CASCADE,
+      code_hash TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL,
+      expires_at TEXT NOT NULL,
+      used_at TEXT
+    );
   `);
+
+  const accountColumns = db.prepare('PRAGMA table_info(cloud_accounts)').all();
+  if (!accountColumns.some((column) => column.name === 'token_active')) {
+    db.exec('ALTER TABLE cloud_accounts ADD COLUMN token_active INTEGER NOT NULL DEFAULT 1;');
+  }
+  if (!accountColumns.some((column) => column.name === 'support_complimentary')) {
+    db.exec('ALTER TABLE cloud_accounts ADD COLUMN support_complimentary INTEGER NOT NULL DEFAULT 1;');
+  }
 
   const scenarioSetting = db.prepare("SELECT value FROM system_settings WHERE key = 'active_scenario'").get();
   if (!scenarioSetting) {

@@ -19,7 +19,7 @@ async function startApp() {
 }
 
 startApp().catch((error) => {
-  console.error('[Dynamic Pilates] Falha ao iniciar:', error);
+  console.error('[Zello] Falha ao iniciar:', error);
   document.getElementById('root').innerHTML = `
     <main style="font-family: system-ui; padding: 32px; max-width: 560px; margin: auto">
       <h1>Não foi possível abrir o aplicativo</h1>

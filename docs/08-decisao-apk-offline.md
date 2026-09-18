@@ -12,7 +12,7 @@ O MVP original usa um frontend React conectado a um servidor Fastify e a um SQLi
 
 ## Decisão
 
-O frontend React/JavaScript será empacotado com Capacitor como APK Android. As operações usarão SQLite no próprio dispositivo. O servidor Node não participará do funcionamento diário.
+O frontend React/JavaScript será empacotado com Capacitor como APK Android. As operações usarão SQLite no próprio dispositivo. O servidor Node não participa do funcionamento diário; ele é usado somente para ativação por token, backup premium, restauração assistida e distribuição de APKs.
 
 ## Princípios de interface
 
@@ -34,7 +34,7 @@ O frontend React/JavaScript será empacotado com Capacitor como APK Android. As 
 - ausência de instalação de Node no tablet;
 - banco relacional local;
 - possibilidade de backup por arquivo;
-- caminho futuro para sincronização opcional.
+- backup remoto opcional sem tornar o uso diário dependente da internet.
 
 ### Custos
 
@@ -49,5 +49,4 @@ O frontend React/JavaScript será empacotado com Capacitor como APK Android. As 
 - painel remoto;
 - funcionamento simultâneo em tablet e computador;
 - publicação automática na Play Store;
-- contas em nuvem.
-
+- sincronização contínua entre aparelhos.

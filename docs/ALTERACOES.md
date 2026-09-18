@@ -1,6 +1,16 @@
 # Registro de alterações
 
-Este arquivo deve ser atualizado em toda mudança funcional, técnica ou de dados do Dynamic Pilates.
+Este arquivo deve ser atualizado em toda mudança funcional, técnica ou de dados do Zello.
+
+## 2026-09-18 — Zello 1.1.0
+
+- nova identidade Zello aplicada à interface, ícone e tela de abertura;
+- login obrigatório com token emitido pela equipe técnica;
+- sessão offline após a primeira validação;
+- backup premium enviado ao servidor, atualmente gratuito;
+- restauração assistida por WhatsApp e código temporário de uso único;
+- API de atualização e publicação de novos APKs;
+- backup compactado e criptografado em repouso com AES-256-GCM.
 
 ## 2026-09-10 — Início da migração para aplicativo offline
 

@@ -1,17 +1,25 @@
 {
-  "name": "dynamic-pilates",
-  "version": "1.0.0",
+  "name": "zello",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "npm --prefix client run dev",
+    "dev": "concurrently --kill-others --names API,APP --prefix-colors cyan,green \"npm run server:dev\" \"npm run client\"",
     "client": "npm --prefix client run dev",
     "build": "npm --prefix client run build",
     "android:sync": "npm --prefix client run android:sync",
     "android:open": "npm --prefix client run android:open",
     "android:run": "npm --prefix client run android:run",
+    "server": "npm --prefix server start",
+    "server:dev": "npm --prefix server run dev",
     "legacy:server": "npm --prefix server start",
     "legacy:server:dev": "npm --prefix server run dev",
-    "legacy:seed": "npm --prefix server run seed"
+    "legacy:seed": "npm --prefix server run seed",
+    "token:create": "npm --prefix server run token:create --",
+    "restore-code:create": "npm --prefix server run restore-code:create --",
+    "release:publish": "npm --prefix server run release:publish --"
+  },
+  "devDependencies": {
+    "concurrently": "10.0.5"
   }
 }
