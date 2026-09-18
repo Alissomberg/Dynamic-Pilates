@@ -132,6 +132,14 @@ function localDateString(offsetDays = 0) {
   return `${year}-${month}-${day}`;
 }
 
+function addMonths(dateString, months, fixedDay) {
+  const [year, month] = dateString.split('-').map(Number);
+  const target = new Date(year, month - 1 + Number(months), 1, 12);
+  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
+  target.setDate(Math.min(Number(fixedDay), lastDay));
+  return `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, '0')}-${String(target.getDate()).padStart(2, '0')}`;
+}
+
 function weekdayForOffset(offsetDays = 0) {
   const date = new Date();
   date.setDate(date.getDate() + offsetDays);
@@ -182,7 +190,8 @@ async function seedMockData(db, ownerUserId = null) {
   const createdAt = nowIso();
   await db.beginTransaction();
   try {
-    const addStudent = async ({ name, phone, notes, plan, dueOffset, paid, scheduleDay, scheduleTime }) => {
+    const addStudent = async ({ name, phone, notes, plan, dueOffset, dueDateOverride, dueDay = 10, paid, scheduleDay, scheduleTime }) => {
+      const startDate = localDateString(-30);
       const studentChange = await db.run(
         'INSERT INTO alunos (owner_user_id, nome, telefone, observacoes, ativo, criado_em) VALUES (?, ?, ?, ?, 1, ?)',
         [ownerUserId, name, phone, notes, createdAt], false
@@ -194,8 +203,8 @@ async function seedMockData(db, ownerUserId = null) {
           dia_vencimento, data_inicio, ativo, criado_em)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`,
         [studentId, plan.id, plan.nome, Number(plan.duracao_meses) === 3 ? 'trimestral' : 'mensal',
-          plan.duracao_meses, plan.duracao_meses, plan.valor_centavos, 10,
-          localDateString(-30), createdAt], false
+          plan.duracao_meses, plan.duracao_meses, plan.valor_centavos, dueDay,
+          startDate, createdAt], false
       );
       const contractId = Number(contractChange.changes.lastId);
       await db.run(
@@ -203,7 +212,7 @@ async function seedMockData(db, ownerUserId = null) {
         [studentId, scheduleDay, scheduleTime], false
       );
 
-      const dueDate = localDateString(dueOffset);
+      const dueDate = dueDateOverride || localDateString(dueOffset);
       const chargeChange = await db.run(
         `INSERT INTO cobrancas (aluno_id, contrato_id, competencia, data_vencimento,
           valor_centavos, status, criado_em) VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -217,7 +226,7 @@ async function seedMockData(db, ownerUserId = null) {
             forma_pagamento, observacao, criado_em) VALUES (?, ?, ?, ?, 'pix', 'Pagamento de demonstração', ?)`,
           [chargeId, studentId, localDateString(-1), plan.valor_centavos, createdAt], false
         );
-        const nextDueDate = localDateString(30);
+        const nextDueDate = addMonths(dueDate, Number(plan.duracao_meses), 10);
         await db.run(
           `INSERT INTO cobrancas (aluno_id, contrato_id, competencia, data_vencimento,
             valor_centavos, status, criado_em) VALUES (?, ?, ?, ?, ?, 'pendente', ?)`,
@@ -244,13 +253,29 @@ async function seedMockData(db, ownerUserId = null) {
     });
     await addStudent({
       name: 'Carlos Eduardo Lima', phone: '(85) 99999-1002',
-      notes: 'Cenário de cobrança paga.', plan: quarterly,
-      dueOffset: -5, paid: true, scheduleDay: weekdayForOffset(1), scheduleTime: '14:00'
+      notes: 'Plano trimestral iniciado há um mês.', plan: quarterly,
+      dueDateOverride: addMonths(localDateString(-30), 3, 18), dueDay: 18,
+      paid: false, scheduleDay: weekdayForOffset(1), scheduleTime: '14:00'
     });
     await addStudent({
       name: 'Mariana Souza Costa', phone: '(85) 99999-1003',
       notes: 'Cenário de cobrança em atraso.', plan: monthly,
       dueOffset: -10, paid: false, scheduleDay: weekdayForOffset(2), scheduleTime: '18:00'
+    });
+    await addStudent({
+      name: 'Fernanda Alves Rocha', phone: '(85) 99999-1004',
+      notes: 'Cenário de cobrança paga.', plan: monthly,
+      dueOffset: -5, paid: true, scheduleDay: weekdayForOffset(3), scheduleTime: '07:30'
+    });
+    await addStudent({
+      name: 'Roberto Martins Silva', phone: '(85) 99999-1005',
+      notes: 'Plano trimestral com próxima cobrança futura.', plan: quarterly,
+      dueOffset: 70, paid: false, scheduleDay: weekdayForOffset(4), scheduleTime: '16:00'
+    });
+    await addStudent({
+      name: 'Luiza Ferreira Gomes', phone: '(85) 99999-1006',
+      notes: 'Plano mensal em dia.', plan: monthly,
+      dueOffset: 4, paid: false, scheduleDay: weekdayForOffset(5), scheduleTime: '10:00'
     });
     await db.run("INSERT INTO settings (key, value) VALUES ('mock_data_seed_v1', 'installed')", [], false);
     await db.commitTransaction();
@@ -290,6 +315,40 @@ async function clearOperationalTables(db) {
   }
 }
 
+async function fixLegacyQuarterlyMock(db) {
+  const marker = await db.query("SELECT value FROM settings WHERE key = 'quarterly_mock_fix_v1'");
+  if (marker.values?.length) return;
+  const rows = await db.query(
+    `SELECT a.id AS aluno_id, c.id AS contrato_id, c.data_inicio, c.valor_centavos
+       FROM alunos a JOIN contratos c ON c.aluno_id = a.id AND c.ativo = 1
+      WHERE a.nome = 'Carlos Eduardo Lima'
+        AND a.observacoes = 'Cenário de cobrança paga.'
+        AND c.periodicidade_cobranca_meses = 3
+      LIMIT 1`
+  );
+  const item = rows.values?.[0];
+  if (item) {
+    const dueDate = addMonths(item.data_inicio, 3, 18);
+    await db.beginTransaction();
+    try {
+      await db.run('DELETE FROM pagamentos WHERE aluno_id = ?', [item.aluno_id], false);
+      await db.run('DELETE FROM cobrancas WHERE aluno_id = ?', [item.aluno_id], false);
+      await db.run('UPDATE contratos SET dia_vencimento = 18 WHERE id = ?', [item.contrato_id], false);
+      await db.run(
+        `INSERT INTO cobrancas (aluno_id, contrato_id, competencia, data_vencimento,
+          valor_centavos, status, criado_em) VALUES (?, ?, ?, ?, ?, 'pendente', ?)`,
+        [item.aluno_id, item.contrato_id, dueDate.slice(0, 7), dueDate, item.valor_centavos, nowIso()],
+        false
+      );
+      await db.commitTransaction();
+    } catch (error) {
+      await db.rollbackTransaction();
+      throw error;
+    }
+  }
+  await db.run("INSERT OR REPLACE INTO settings (key, value) VALUES ('quarterly_mock_fix_v1', 'applied')", [], false);
+}
+
 async function openDatabase() {
   if (Capacitor.getPlatform() === 'web') {
     await sqlite.initWebStore();
@@ -313,6 +372,7 @@ async function openDatabase() {
   );
   await seedPlanPresets(db);
   await seedMockData(db);
+  await fixLegacyQuarterlyMock(db);
   await persistWebDatabase();
   return db;
 }

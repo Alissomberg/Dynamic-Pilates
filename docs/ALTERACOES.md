@@ -9,6 +9,8 @@ Este arquivo deve ser atualizado em toda mudança funcional, técnica ou de dado
 - SuperUsers e afiliados compartilham os alunos do próprio grupo;
 - o Admin pode consultar e alterar alunos de todos os grupos;
 - adicionados controles exclusivos do Admin para zerar dados operacionais ou carregar dados mock;
+- usuários podem remover alunos do próprio grupo com confirmação;
+- corrigida a recorrência trimestral e ampliada a base mock para seis alunos;
 - removida a verificação online de tokens do aplicativo;
 - login simplificado para PIN numérico de 6 dígitos;
 - adicionados perfis locais Admin, SuperUser e Afiliado;

@@ -267,6 +267,20 @@ async function updateAlunoHorarios(id, schedules) {
   return getAlunoById(studentId);
 }
 
+async function deleteAluno(id) {
+  const studentId = Number(id);
+  await assertStudentAccess(studentId);
+  await inTransaction(async (db) => {
+    await db.run('DELETE FROM pagamentos WHERE aluno_id = ?', [studentId], false);
+    await db.run('DELETE FROM cobrancas WHERE aluno_id = ?', [studentId], false);
+    await db.run('DELETE FROM presencas WHERE aluno_id = ?', [studentId], false);
+    await db.run('DELETE FROM aluno_horarios WHERE aluno_id = ?', [studentId], false);
+    await db.run('DELETE FROM contratos WHERE aluno_id = ?', [studentId], false);
+    await db.run('DELETE FROM alunos WHERE id = ?', [studentId], false);
+  });
+  return { success: true, alunoId: studentId };
+}
+
 async function getAlunoHistoricoMensal(id, month = localDateString().slice(0, 7)) {
   const studentId = Number(id);
   await assertStudentAccess(studentId);
@@ -501,9 +515,9 @@ async function loadMockData() {
 export const api = {
   setCurrentAccount,
   getDashboard, getAlunos, getAlunoById, getAlunoHistoricoMensal, updateAlunoHorarios,
-  createAluno, updateAluno, getPresencasDia, checkinPresenca, getPendencias,
+  createAluno, updateAluno, deleteAluno, getPresencasDia, checkinPresenca, getPendencias,
   getHistoricoFinanceiro, getResumoFinanceiro, registrarPagamento, getPlanPresets,
   createPlanPreset, exportBackup, importBackup, resetOperationalData, loadMockData
 };
 
-export const dateUtils = { localDateString, addMonths, financialStatus };
+export const dateUtils = { localDateString, addMonths, firstDueDate, financialStatus };

@@ -25,7 +25,8 @@ import {
   ShieldCheck,
   FileText,
   Settings2,
-  Plus
+  Plus,
+  Trash2
 } from 'lucide-react';
 
 const DIAS_SEMANA = [
@@ -149,6 +150,18 @@ export function Alunos() {
     onError: (err) => {
       alert('Erro ao cadastrar aluno: ' + err.message);
     }
+  });
+
+  const excluirAlunoMutation = useMutation({
+    mutationFn: (id) => api.deleteAluno(id),
+    onSuccess: () => {
+      setSelectedAlunoId(null);
+      queryClient.invalidateQueries({ queryKey: ['alunos'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['presencas'] });
+      queryClient.invalidateQueries({ queryKey: ['financeiro'] });
+    },
+    onError: (error) => alert(`Não foi possível remover o aluno: ${error.message}`)
   });
 
   const handleSalvarNovoAluno = (e) => {
@@ -698,6 +711,20 @@ export function Alunos() {
                 <p className="text-xs text-slate-400 py-3 text-center">Nenhum registro de presença neste mês.</p>
               )}
             </div>
+
+            <TouchButton
+              variant="danger"
+              icon={Trash2}
+              loading={excluirAlunoMutation.isPending}
+              onClick={() => {
+                if (window.confirm(`Remover ${alunoDetalhe.nome} e todo o histórico desse aluno?`)) {
+                  excluirAlunoMutation.mutate(alunoDetalhe.id);
+                }
+              }}
+              className="w-full"
+            >
+              Remover aluno
+            </TouchButton>
           </div>
         )}
       </TouchModal>

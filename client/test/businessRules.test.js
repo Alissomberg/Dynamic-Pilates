@@ -4,6 +4,7 @@ import { dateUtils } from '../src/services/api.js';
 
 test('plano trimestral avança exatamente três meses', () => {
   assert.equal(dateUtils.addMonths('2026-09-10', 3, 10), '2026-12-10');
+  assert.equal(dateUtils.firstDueDate('2026-08-19', 18, 3), '2026-11-18');
 });
 
 test('vencimento no fim do mês é limitado ao último dia disponível', () => {
