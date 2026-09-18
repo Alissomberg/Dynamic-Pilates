@@ -45,7 +45,7 @@ export function Login({ onLogin, apiConfigured }) {
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck="false"
-                placeholder="zel_live_..."
+                placeholder="Cole seu token de acesso"
                 className="w-full min-h-[54px] rounded-xl border border-slate-300 bg-white pl-11 pr-4 text-base outline-none focus:border-pilates-600 focus:ring-2 focus:ring-pilates-100"
               />
             </div>

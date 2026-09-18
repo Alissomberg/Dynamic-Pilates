@@ -12,6 +12,11 @@ Este arquivo deve ser atualizado em toda mudança funcional, técnica ou de dado
 - API de atualização e publicação de novos APKs;
 - backup compactado e criptografado em repouso com AES-256-GCM.
 
+## 2026-09-18 — Tokens compactos
+
+- novos tokens passam a ter 24 caracteres URL-safe;
+- tokens antigos continuam válidos para não interromper clientes já ativados.
+
 ## 2026-09-10 — Início da migração para aplicativo offline
 
 ### Decisões aprovadas

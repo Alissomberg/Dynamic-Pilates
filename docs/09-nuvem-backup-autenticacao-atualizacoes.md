@@ -9,6 +9,7 @@ O uso diário continua offline. A conexão é obrigatória na primeira ativaçã
 - a equipe cria o token com `npm run token:create -- --name "Cliente"`;
 - o servidor guarda somente um HMAC do token; o valor completo aparece uma única vez;
 - todos os tokens novos começam com suporte `premium` ativo e gratuito;
+- tokens novos têm 24 caracteres URL-safe para facilitar a digitação e o compartilhamento;
 - o app envia o token no cabeçalho `Authorization: Bearer` somente por HTTPS;
 - a sessão offline previamente validada continua disponível até o usuário sair ou os dados do app serem limpos.
 

@@ -53,7 +53,9 @@ export function publicAccount(account) {
 }
 
 export function createAccountToken(displayName, supportTier = 'premium', complimentary = true) {
-  const token = `zel_live_${crypto.randomBytes(24).toString('base64url')}`;
+  // 18 bytes geram exatamente 24 caracteres base64url, mantendo entropia suficiente
+  // para um token de acesso entregue manualmente ao cliente.
+  const token = crypto.randomBytes(18).toString('base64url');
   const account = {
     id: crypto.randomUUID(),
     name: String(displayName || 'Cliente Zello').trim(),

@@ -29,6 +29,7 @@ after(async () => {
 
 test('token autentica, envia backup e restaura com código de uso único', async () => {
   const account = createAccountToken('Cliente de teste');
+  assert.equal(account.token.length, 24);
   const authorization = { authorization: `Bearer ${account.token}` };
 
   const authResponse = await server.inject({
