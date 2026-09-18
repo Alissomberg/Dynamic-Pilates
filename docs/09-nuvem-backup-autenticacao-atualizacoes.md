@@ -4,22 +4,25 @@
 
 O aplicativo atual é totalmente independente. A autenticação, o banco operacional, o backup e a restauração funcionam no dispositivo sem chamadas HTTP. A camada de nuvem descrita anteriormente está pausada para uma futura versão.
 
-## Token de acesso
+## PIN e token de plano
 
-- tokens são criados na tela **Ajustes > Tokens locais**;
+- todos os usuários entram com um PIN numérico de 6 dígitos;
+- o SQLite guarda somente o hash do PIN;
+- somente o admin registra tokens;
 - o SQLite guarda somente o hash do token e os metadados do usuário;
 - tokens novos têm 24 caracteres URL-safe;
 - o valor completo aparece uma única vez para ser copiado pela equipe técnica;
-- o login consulta apenas o SQLite local;
-- o token de demonstração é `zello-demo-2026` em instalações novas.
+- receber um token transforma o usuário em SuperUser com direito a cadastrar até dois afiliados;
+- afiliados recebem PIN, não recebem token e não podem cadastrar outros usuários;
+- o login consulta apenas o SQLite local.
 
 ### Perfis iniciais
 
-- `admin` / `ZelloAdmin#2026`: vê todos os usuários e registra tokens;
-- `sue9` / `Sue9@2026`: pode cadastrar no máximo dois usuários adicionais;
-- `joao` / `Joao@2026`: usuário local do Doutor João.
+- Admin — PIN `731946`: vê todos os usuários e registra tokens;
+- Doutor João — PIN `482615`: primeiro SuperUser, com limite de dois afiliados;
+- token inicial do Doutor João: `zello_joao_2026_superusr`.
 
-Essas credenciais são dados de teste. Troque-as antes de entregar uma instalação real.
+Esses PINs são dados iniciais para teste e implantação.
 
 ## Backup e restauração
 

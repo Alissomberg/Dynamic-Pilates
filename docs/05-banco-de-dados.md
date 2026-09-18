@@ -12,7 +12,7 @@ O schema atual tem versão `3` e fica em `client/src/db/localDatabase.js`.
 |---|---|
 | `schema_migrations` | versão aplicada do schema |
 | `settings` | configurações futuras por chave/valor |
-| `local_users` | usuários locais, senha com hash, perfil e cota de cadastro |
+| `local_users` | usuários locais, PIN com hash, perfil e cota de afiliados |
 | `access_tokens` | tokens locais, hash, usuário e status de acesso |
 | `plan_presets` | opções frequentes de nome, meses e valor |
 | `alunos` | dados pessoais e status ativo |
@@ -50,7 +50,8 @@ Em um banco vazio são criados:
 - Mensal: 1 mês, R$ 185;
 - Trimestral: 3 meses, R$ 555.
 - três alunos fictícios para demonstração, com contratos, cobranças, pagamentos e presenças;
-- um acesso local de demonstração com o token `zello-demo-2026`.
+- uma conta admin com PIN de 6 dígitos;
+- o Doutor João como primeiro SuperUser, com token e limite de dois afiliados.
 
 Os dados de demonstração só são incluídos quando ainda não há alunos no banco. O servidor legado não participa desse seed.
 

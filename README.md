@@ -13,25 +13,16 @@ npm run client
 
 Acesse `http://localhost:3000`.
 
-## Token de teste
+## Login local por PIN
 
-Em uma instalação nova, use este token local na tela de login:
+Todos os usuários entram com um PIN numérico de 6 dígitos. Contas iniciais:
 
-```powershell
-zello-demo-2026
-```
-
-Para criar tokens adicionais, abra **Ajustes > Tokens locais**, informe o nome do usuário e copie o token exibido. O valor completo aparece somente uma vez e fica validado pelo SQLite local.
-
-## Contas locais iniciais
-
-| Usuário | Senha | Permissão |
+| Perfil | PIN | Permissão |
 |---|---|---|
-| `admin` | `ZelloAdmin#2026` | vê todos os usuários e registra tokens |
-| `sue9` | `Sue9@2026` | cadastra no máximo 2 usuários |
-| `joao` | `Joao@2026` | usuário do Doutor João |
+| Admin | `731946` | vê todos os usuários e registra tokens |
+| Doutor João | `482615` | SuperUser com token e até 2 afiliados |
 
-Troque essas senhas na primeira entrega por credenciais mantidas em um gerenciador seguro.
+O token inicial do Doutor João é `zello_joao_2026_superusr`. O token define o plano de SuperUser; ele não é usado na tela de login. Afiliados criados pelo SuperUser recebem apenas um PIN e não podem criar outros usuários.
 
 ## Android
 

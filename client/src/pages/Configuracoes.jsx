@@ -27,6 +27,12 @@ function backupFileName() {
   return `zello-backup-${new Date().toISOString().slice(0, 10)}.json`;
 }
 
+function roleLabel(role) {
+  if (role === 'admin') return 'Admin';
+  if (role === 'manager') return 'SuperUser';
+  return 'Afiliado';
+}
+
 export function Configuracoes({ auth, onLogout }) {
   const [message, setMessage] = useState('');
   const [processing, setProcessing] = useState('');
@@ -35,7 +41,7 @@ export function Configuracoes({ auth, onLogout }) {
   const [users, setUsers] = useState([]);
   const [newUsername, setNewUsername] = useState('');
   const [newUserName, setNewUserName] = useState('');
-  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserPin, setNewUserPin] = useState('');
   const [selectedUserId, setSelectedUserId] = useState('');
   const account = auth.account;
   const canManageUsers = account.role === 'admin' || account.role === 'manager';
@@ -45,7 +51,8 @@ export function Configuracoes({ auth, onLogout }) {
     if (!canManageUsers) return;
     listLocalUsers(account).then((items) => {
       setUsers(items);
-      if (!selectedUserId && items[0]) setSelectedUserId(String(items[0].id));
+      const firstTokenCandidate = items.find((item) => item.role !== 'admin');
+      if (!selectedUserId && firstTokenCandidate) setSelectedUserId(String(firstTokenCandidate.id));
     }).catch((error) => setMessage(error.message));
   }, [account.id, account.role]);
 
@@ -109,15 +116,15 @@ export function Configuracoes({ auth, onLogout }) {
   };
 
   const registerUser = async () => {
-    setProcessing('token');
+    setProcessing('user');
     setMessage('');
     try {
-      await createLocalUser(account, { username: newUsername, displayName: newUserName, password: newUserPassword });
+      await createLocalUser(account, { username: newUsername, displayName: newUserName, pin: newUserPin });
       setNewUsername('');
       setNewUserName('');
-      setNewUserPassword('');
+      setNewUserPin('');
       setUsers(await listLocalUsers(account));
-      setMessage('Usuário local criado. Entregue a senha com segurança.');
+      setMessage('Usuário local criado. Entregue o PIN com segurança.');
     } catch (error) {
       setMessage(`Não foi possível criar o usuário: ${error.message}`);
     } finally {
@@ -131,6 +138,7 @@ export function Configuracoes({ auth, onLogout }) {
     try {
       const result = await createLocalToken(account, Number(selectedUserId));
       setCreatedToken(result.token);
+      setUsers(await listLocalUsers(account));
       setMessage('Token local criado. Ele será exibido somente agora; copie e guarde com segurança.');
     } catch (error) {
       setMessage(`Não foi possível criar o token: ${error.message}`);
@@ -191,22 +199,22 @@ export function Configuracoes({ auth, onLogout }) {
           <div className="w-11 h-11 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center shrink-0"><KeyRound className="w-5 h-5" /></div>
           <div><h3 className="font-bold text-slate-900">Administração local</h3><p className="text-sm text-slate-500 mt-1">Usuários e permissões ficam neste SQLite. Não existe consulta online.</p></div>
         </div>
-        <p className="text-xs text-slate-500 mb-3">Acesso atual: <span className="font-semibold text-slate-800">{account.name}</span> · perfil <span className="font-semibold">{account.role}</span>{account.role === 'manager' ? ` · limite: ${account.maxUsers} usuários` : ''}</p>
+        <p className="text-xs text-slate-500 mb-3">Acesso atual: <span className="font-semibold text-slate-800">{account.name}</span> · perfil <span className="font-semibold">{roleLabel(account.role)}</span>{account.role === 'manager' ? ` · limite: ${account.maxUsers} afiliados` : ''}</p>
         <div className="grid sm:grid-cols-3 gap-3">
           <input value={newUsername} onChange={(event) => setNewUsername(event.target.value)} placeholder="Usuário (ex.: joao)" className="min-h-[50px] rounded-xl border border-slate-300 px-4 outline-none focus:border-pilates-600 focus:ring-2 focus:ring-pilates-100" />
           <input value={newUserName} onChange={(event) => setNewUserName(event.target.value)} placeholder="Nome completo" className="min-h-[50px] rounded-xl border border-slate-300 px-4 outline-none focus:border-pilates-600 focus:ring-2 focus:ring-pilates-100" />
-          <input type="password" value={newUserPassword} onChange={(event) => setNewUserPassword(event.target.value)} placeholder="Senha (mín. 6)" className="min-h-[50px] rounded-xl border border-slate-300 px-4 outline-none focus:border-pilates-600 focus:ring-2 focus:ring-pilates-100" />
+          <input type="password" inputMode="numeric" maxLength={6} value={newUserPin} onChange={(event) => setNewUserPin(event.target.value.replace(/\D/g, '').slice(0, 6))} placeholder="PIN de 6 números" className="min-h-[50px] rounded-xl border border-slate-300 px-4 outline-none focus:border-pilates-600 focus:ring-2 focus:ring-pilates-100" />
         </div>
-        <TouchButton icon={KeyRound} onClick={registerUser} loading={processing === 'token'} disabled={Boolean(processing)} className="w-full mt-3">Cadastrar usuário</TouchButton>
+        <TouchButton icon={KeyRound} onClick={registerUser} loading={processing === 'user'} disabled={Boolean(processing)} className="w-full mt-3">Cadastrar usuário</TouchButton>
         <div className="mt-5 rounded-xl border border-slate-200 overflow-hidden">
           <div className="bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">Usuários cadastrados</div>
-          {users.map((user) => <div key={user.id} className="px-3 py-2 border-t border-slate-100 text-sm flex flex-wrap gap-x-3 gap-y-1"><span className="font-semibold">{user.display_name}</span><span className="text-slate-500">@{user.username}</span><span className="text-slate-500">{user.role}</span><span className="text-slate-500">tokens: {user.token_count}</span></div>)}
+          {users.map((user) => <div key={user.id} className="px-3 py-2 border-t border-slate-100 text-sm flex flex-wrap gap-x-3 gap-y-1"><span className="font-semibold">{user.display_name}</span><span className="text-slate-500">@{user.username}</span><span className="text-slate-500">{roleLabel(user.role)}</span><span className="text-slate-500">tokens: {user.token_count}</span></div>)}
         </div>
         {isAdmin && <div className="mt-5 border-t border-slate-200 pt-4">
           <p className="text-sm font-semibold text-slate-800 mb-2">Registrar token para um usuário</p>
           <div className="grid sm:grid-cols-[1fr_auto] gap-3">
             <select value={selectedUserId} onChange={(event) => setSelectedUserId(event.target.value)} className="min-h-[50px] rounded-xl border border-slate-300 px-4 bg-white">
-              {users.map((user) => <option key={user.id} value={user.id}>{user.display_name} (@{user.username})</option>)}
+              {users.filter((user) => user.role !== 'admin').map((user) => <option key={user.id} value={user.id}>{user.display_name} (@{user.username})</option>)}
             </select>
             <TouchButton icon={KeyRound} onClick={registerToken} loading={processing === 'token'} disabled={Boolean(processing) || !selectedUserId}>Criar token</TouchButton>
           </div>
